@@ -10,6 +10,9 @@
   <link rel="stylesheet" href="/workshop.css">
   <link rel="stylesheet" href="/connections.css">
   <link rel="stylesheet" href="/controls.css">
+  <link rel="stylesheet" href="/date-picker.css">
+  <script type="module" src="/controls.js"></script>
+  <script type="module" src="/date-picker.js"></script>
   <script type="module" src="/connections.js"></script>
 </head>
 <body class="studio">
@@ -65,6 +68,23 @@
           <p class="connection-help" data-field="help"></p>
           <div class="connection-actions" data-team-control hidden><form action="/api/connections/tiktok" method="post"><button class="button" id="connect-tiktok" type="submit" disabled>Connect TikTok ↗</button></form><button class="button secondary" data-sync="tiktok" type="button" disabled>Refresh TikTok</button></div>
         </article>
+      </section>
+      <section class="studio-import" data-team-control hidden aria-labelledby="studio-import-heading">
+        <div class="studio-import-heading"><span class="eyebrow">TIKTOK STUDIO</span><h2 id="studio-import-heading">Import Studio exports</h2><p>Add daily performance and follower breakdowns from TikTok Studio. Public video counters continue to refresh through the connected API.</p></div>
+        <form id="studio-import-form">
+          <label class="studio-file-label" for="studio-import-files">Studio CSV files<input id="studio-import-files" type="file" accept=".csv,text/csv" multiple required></label>
+          <p class="studio-import-help">Choose Overview.csv, FollowerHistory.csv and Viewers.csv. FollowerGender.csv and FollowerTopTerritories.csv are optional.</p>
+          <fieldset class="studio-import-capture"><legend>Export downloaded on</legend><p>Enter when this set of exports was downloaded, in UTC. Change this for older files; the upload time is recorded separately.</p><div><label>Date<input id="studio-capture-date" type="date" required></label><label>Time (UTC)<input id="studio-capture-time" type="time" step="1" required></label></div></fieldset>
+          <div class="studio-import-windows">
+            <fieldset><legend>Overview and follower export dates</legend><p>Include the year shown in the exported report window.</p><div><label>From<input id="studio-overview-start" type="date" required></label><label>To<input id="studio-overview-end" type="date" required></label></div></fieldset>
+            <fieldset><legend>Viewer export dates</legend><p>Use the viewer report’s own dates; they can differ.</p><div><label>From<input id="studio-viewers-start" type="date" required></label><label>To<input id="studio-viewers-end" type="date" required></label></div></fieldset>
+          </div>
+          <p class="studio-import-help">TikTok exports can omit the year and timezone. Dates are checked against the CSV rows; the timezone stays unspecified. Raw CSV files are processed in this browser.</p>
+          <button class="button secondary" id="studio-import-review" type="submit">Review report</button>
+        </form>
+        <div id="studio-import-message" class="notice" role="status" hidden></div>
+        <div id="studio-import-preview" hidden></div>
+        <div class="studio-import-publish" id="studio-import-publish" hidden><p>Publish the reviewed data to the shared dashboard and YEET. Previously saved viewer demographics keep their own dates when they are absent from this export.</p><button class="button" id="studio-import-save" type="button" disabled>Publish Studio report</button></div>
       </section>
       <aside class="reporting-note"><span class="eyebrow">REFRESH DETAILS</span><h3>Report refreshes</h3><p>Reporting runs on the server and saves successful collections. A failed refresh keeps the previous evidence. A connection alone does not mean a fresh report has been collected.</p><p>The team connects accounts once. YEET can refresh connected reporting accounts without signing in.</p><a href="/workshop.html">Open Studio ↗</a></aside>
     </div>

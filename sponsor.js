@@ -14,7 +14,7 @@ const rangeLabel = range => range?.start && range?.end ? `${date(range.start)} �
 
 // Calendar windows remain equal. Missing native rows never become invented zeroes.
 export function comparePeriods(performance, days, key) {
-  if (!validDay(performance?.dateRange?.end) || ![7, 14, 28].includes(days)) return null;
+  if (!validDay(performance?.dateRange?.end) || ![7, 14, 28, 90, 365].includes(days)) return null;
   const end = performance.dateRange.end, start = addDays(end, 1 - days);
   const previousEnd = addDays(start, -1), previousStart = addDays(start, -days);
   const rows = new Map((performance.daily || []).map(row => [row.date, row]));
@@ -57,6 +57,12 @@ export function sponsorSources(value) {
     source: value?.sources?.find(item => item.id === platform.id) || null }));
 }
 export function sourcePerformance(value) {
+  if (value?.id === 'tiktok' && value.studioSupplement?.performance) {
+    const studio = value.studioSupplement.performance;
+    return { ...studio, studio: true,
+      daily: studio.daily.map(row => ({ ...row, subscribersNet: row.netFollowers ?? null })),
+    };
+  }
   if (value?.performance) return value.performance;
   if (!value?.dateRange || !Array.isArray(value.daily) || !value.daily.some(row => Number.isFinite(row.views))) return null;
   return { capturedAt: value.capturedAt,
@@ -68,6 +74,25 @@ export function sourcePerformance(value) {
         .map(key => [key, Number.isFinite(row[key]) ? row[key] : null])) })),
   };
 }
+const studioMetricDefinitions = [
+  ['views', 'Views'], ['profileViews', 'Profile views'], ['likes', 'Likes'], ['comments', 'Comments'],
+  ['shares', 'Shares'], ['netFollowers', 'Net followers'], ['followers', 'Followers'],
+  ['totalViewers', 'Viewers'], ['newViewers', 'New viewers'], ['returningViewers', 'Returning viewers'],
+];
+export function metricPerformance(performance, key = 'views') {
+  if (!performance) return null;
+  const family = ['followers', 'netFollowers', 'subscribersNet'].includes(key) ? 'followers'
+    : ['totalViewers', 'newViewers', 'returningViewers'].includes(key) ? 'viewers' : 'overview';
+  const dateRange = performance.seriesRanges?.[family] || performance.dateRange;
+  return { ...performance, dateRange, daily: performance.daily.filter(row => row.date >= dateRange.start && row.date <= dateRange.end) };
+}
+export function trendPoints(performance, key = 'views', days = null, cumulative = false) {
+  if (!performance?.dateRange) return [];
+  const end = performance.dateRange.end, start = days ? addDays(end, 1 - days) : performance.dateRange.start;
+  let total = 0;
+  return [...performance.daily].filter(row => row.date >= start && row.date <= end).sort((a, b) => a.date.localeCompare(b.date))
+    .map(row => ({ date: row.date, value: Number.isFinite(row[key]) ? cumulative ? (total += row[key]) : row[key] : null }));
+}
 export function hasSourceSnapshot(value) {
   return value?.status === 'snapshot' && Boolean(value.metrics || value.performance);
 }
@@ -75,6 +100,18 @@ export function audienceShares(rows) {
   const valid = (rows || []).filter(row => typeof row.label === 'string' && Number.isFinite(row.count) && row.count >= 0);
   const total = valid.reduce((sum, row) => sum + row.count, 0);
   return total > 0 ? valid.map(row => ({ ...row, share: row.count / total * 100 })) : [];
+}
+export function studioPercentage(row) {
+  const threshold = row?.percentage === null && Number.isFinite(row?.lessThan);
+  const value = threshold ? row.lessThan : row?.percentage;
+  return { label: Number.isFinite(value) ? `${threshold ? '<' : ''}${number(value)}%` : 'Unavailable',
+    width: Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0, threshold };
+}
+function studioPercentageBars(rows, label = value => value) {
+  return `<div class="yeet-horizontal-bars">${rows.map(row => {
+    const formatted = studioPercentage(row);
+    return `<div class="yeet-bar-row"><div><span>${escapeHTML(label(row.label))}</span><strong>${escapeHTML(formatted.label)}</strong></div><div class="yeet-bar-track ${formatted.threshold ? 'is-threshold' : ''}" aria-hidden="true"><i style="width:${formatted.width}%"></i></div></div>`;
+  }).join('')}</div>`;
 }
 function sourceName(value) { return socialPlatforms.find(platform => platform.id === value?.id)?.label || 'This platform'; }
 function viewScope(value) {
@@ -110,16 +147,17 @@ function metricCard(label, value, note, unit = '') {
   return `<div class="yeet-stat"><span>${label}</span><strong title="${escapeHTML(number(value))}">${compact(value)}${unit && Number.isFinite(value) ? `<small>${unit}</small>` : ''}</strong><p>${escapeHTML(note)}</p></div>`;
 }
 
-function cumulativeChart(performance) {
-  const rows = cumulativeViews(performance), finite = rows.filter(row => Number.isFinite(row.value));
-  if (!finite.length) return '<div class="yeet-no-data">The daily views report is not available yet.</div>';
+function cumulativeChart(performance, { metric = 'views', days = null, cumulative = true } = {}) {
+  const rows = trendPoints(performance, metric, days, cumulative), finite = rows.filter(row => Number.isFinite(row.value));
+  const metricLabel = studioMetricDefinitions.find(([key]) => key === metric)?.[1] || 'Views';
+  if (!finite.length) return `<div class="yeet-no-data">${metricLabel} have not been returned for these dates.</div>`;
   const sidebarWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar')) || 0;
   const pageWidth = document.querySelector('.yeet-page')?.clientWidth || window.innerWidth - sidebarWidth;
   const width = Math.max(270, Math.min(1300, pageWidth - 80));
   const height = 255, left = width < 400 ? 43 : 57, right = 15, top = 18, bottom = 37;
-  const first = Date.parse(finite[0].date), last = Date.parse(finite.at(-1).date), max = Math.max(1, ...finite.map(row => row.value));
+  const first = Date.parse(finite[0].date), last = Date.parse(finite.at(-1).date), min = Math.min(0, ...finite.map(row => row.value)), max = Math.max(1, ...finite.map(row => row.value));
   const x = day => left + (Date.parse(day) - first) / Math.max(86_400_000, last - first) * (width - left - right);
-  const y = value => top + (1 - value / max) * (height - top - bottom);
+  const y = value => top + (1 - (value - min) / (max - min)) * (height - top - bottom);
   const groups = []; let group = [];
   for (const row of rows) {
     if (!Number.isFinite(row.value) || group.length && Date.parse(row.date) - Date.parse(group.at(-1).date) > 86_400_000) {
@@ -129,14 +167,15 @@ function cumulativeChart(performance) {
   }
   if (group.length) groups.push(group);
   const labels = [0, Math.floor((finite.length - 1) / 2), finite.length - 1].filter((value, index, values) => values.indexOf(value) === index);
-  return `<div class="yeet-chart-wrap"><svg class="yeet-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="yeet-views-title yeet-views-description"><title id="yeet-views-title">Cumulative ${escapeHTML(sourceName(source()))} views</title><desc id="yeet-views-description">${number(finite.at(-1).value)} views across ${finite.length} reported days, ${date(finite[0].date)} to ${date(finite.at(-1).date)}. Missing dates remain gaps.</desc>${[0, .25, .5, .75, 1].map(part => `<line x1="${left}" x2="${width - right}" y1="${y(max * part)}" y2="${y(max * part)}" class="yeet-grid-line"/><text x="${left - 10}" y="${y(max * part) + 4}" text-anchor="end">${compact(max * part)}</text>`).join('')}${groups.map(points => `<path class="yeet-chart-fill" d="M${x(points[0].date)},${y(0)} L${points.map(row => `${x(row.date)},${y(row.value)}`).join(' L')} L${x(points.at(-1).date)},${y(0)}Z"/><path class="yeet-chart-line" d="M${points.map(row => `${x(row.date)},${y(row.value)}`).join(' L')}"/>`).join('')}${finite.map(row => `<circle class="yeet-chart-point" cx="${x(row.date)}" cy="${y(row.value)}" r="5" tabindex="0" aria-label="${escapeHTML(date(row.date))}: ${number(row.value)} cumulative views"><title>${date(row.date)} · ${number(row.value)} views</title></circle>`).join('')}${labels.map((index, order) => `<text x="${x(finite[index].date)}" y="${height - 9}" text-anchor="${order === 0 ? 'start' : order === labels.length - 1 ? 'end' : 'middle'}">${shortDate(finite[index].date)}</text>`).join('')}</svg></div>`;
+  return `<div class="yeet-chart-wrap"><svg class="yeet-line-chart" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="yeet-views-title yeet-views-description"><title id="yeet-views-title">${cumulative ? 'Cumulative ' : 'Daily '}${escapeHTML(sourceName(source()))} ${metricLabel.toLowerCase()}</title><desc id="yeet-views-description">${number(finite.at(-1).value)} ${metricLabel.toLowerCase()} at the final point, across ${finite.length} reported days, ${date(finite[0].date)} to ${date(finite.at(-1).date)}. Missing dates remain gaps.</desc>${[0, .25, .5, .75, 1].map(part => `<line x1="${left}" x2="${width - right}" y1="${y(min + (max - min) * part)}" y2="${y(min + (max - min) * part)}" class="yeet-grid-line"/><text x="${left - 10}" y="${y(min + (max - min) * part) + 4}" text-anchor="end">${compact(min + (max - min) * part)}</text>`).join('')}${groups.map(points => `<path class="yeet-chart-fill" d="M${x(points[0].date)},${y(0)} L${points.map(row => `${x(row.date)},${y(row.value)}`).join(' L')} L${x(points.at(-1).date)},${y(0)}Z"/><path class="yeet-chart-line" d="M${points.map(row => `${x(row.date)},${y(row.value)}`).join(' L')}"/>`).join('')}${finite.map(row => `<circle class="yeet-chart-point" cx="${x(row.date)}" cy="${y(row.value)}" r="5" tabindex="0" aria-label="${escapeHTML(date(row.date))}: ${number(row.value)} ${cumulative ? 'cumulative ' : ''}${metricLabel.toLowerCase()}"><title>${date(row.date)} · ${number(row.value)} ${metricLabel.toLowerCase()}</title></circle>`).join('')}${labels.map((index, order) => `<text x="${x(finite[index].date)}" y="${height - 9}" text-anchor="${order === 0 ? 'start' : order === labels.length - 1 ? 'end' : 'middle'}">${shortDate(finite[index].date)}</text>`).join('')}</svg></div>`;
 }
 
 function changeLabel(comparison, key) {
   if (!comparison.complete) return '<span class="yeet-change neutral">Comparison needs complete daily reports</span>';
   const { change, percent } = comparison;
-  const text = key === 'subscribersNet' || percent === null
-    ? `${change > 0 ? '+' : ''}${number(change)}${key === 'subscribersNet' ? selectedSource === 'youtube-longform' ? ' subscribers' : ' followers' : change === 0 ? ' · no change' : ' vs previous'}`
+  const followerMetric = key === 'subscribersNet' || key === 'netFollowers';
+  const text = followerMetric || percent === null
+    ? `${change > 0 ? '+' : ''}${number(change)}${followerMetric ? selectedSource === 'youtube-longform' ? ' subscribers' : ' followers' : change === 0 ? ' · no change' : ' vs previous'}`
     : `${percent > 0 ? '+' : ''}${number(percent)}%`;
   return `<span class="yeet-change ${change > 0 ? 'positive' : change < 0 ? 'negative' : 'neutral'}">${change > 0 ? '↗ ' : change < 0 ? '↘ ' : ''}${text}</span>`;
 }
@@ -292,6 +331,7 @@ function refreshOutcome(result) {
 }
 
 let report = null, growthDays = 7, refreshing = false, refreshMessage = '', selectedSource = 'youtube-longform';
+let studioMetric = 'views', studioDays = 90, audiencePopulation = 'viewers';
 const source = () => report?.sources?.find(item => item.id === selectedSource);
 function renderRefresh() {
   const host = document.querySelector('#yeet-refresh');
@@ -345,12 +385,48 @@ async function loadReport() {
 }
 
 function growthContent(performance) {
+  if (performance?.studio) performance = metricPerformance(performance, 'views');
   if (!performance) return `<div class="yeet-section-heading"><div><span class="yeet-section-number">02</span><h2>Growth</h2></div></div><div class="yeet-panel yeet-availability"><h3>${escapeHTML(sourceName(source()))} daily history</h3><p>${hasSourceSnapshot(source()) ? 'This connection supplies current counters. Historical daily activity has not been returned.' : 'Growth charts will appear after this account is connected and daily reports are available.'}</p></div>`;
   const comparison = comparePeriods(performance, growthDays, 'views');
   const available = days => performance?.dateRange && addDays(performance.dateRange.end, 1 - days * 2) >= performance.dateRange.start;
-  const metrics = [['views', 'Views'], ['watchHours', 'Watch time', 'h'], ['subscribersNet', selectedSource === 'youtube-longform' ? 'Net subscribers' : 'Net followers']]
+  const metrics = performance?.studio ? studioMetricDefinitions.filter(([key]) => ['views', 'profileViews', 'likes', 'comments', 'shares', 'netFollowers'].includes(key) && performance.daily.some(row => Number.isFinite(row[key]))) : [['views', 'Views'], ['watchHours', 'Watch time', 'h'], ['subscribersNet', selectedSource === 'youtube-longform' ? 'Net subscribers' : 'Net followers']]
     .filter(([key]) => key === 'views' || performance.daily.some(row => Number.isFinite(row[key])));
-  return `<div class="yeet-section-heading"><div><span class="yeet-section-number">02</span><h2>Growth</h2></div><label><span class="sr-only">Growth comparison period</span><select id="yeet-growth-period">${[7, 14, 28].map(days => `<option value="${days}" ${growthDays === days ? 'selected' : ''} ${available(days) ? '' : 'disabled'}>Last ${days} days${available(days) ? '' : ' · more history needed'}</option>`).join('')}</select></label></div><p class="yeet-section-description">${comparison ? `${shortDate(comparison.start)} – ${date(comparison.end)} compared with ${shortDate(comparison.previousStart)} – ${date(comparison.previousEnd)}` : 'Daily reports are needed to compare periods.'}</p><div class="yeet-growth-grid">${metrics.map(([key, label, unit]) => growthCard(performance, growthDays, key, label, unit)).join('')}</div><div class="yeet-period-legend"><span><i></i>Latest ${growthDays} days</span><span><i></i>Previous ${growthDays} days</span></div>`;
+  const periods = performance.studio ? [7, 28, 90, 365] : [7, 14, 28];
+  return `<div class="yeet-section-heading"><div><span class="yeet-section-number">02</span><h2>Growth</h2></div><label><span class="sr-only">Growth comparison period</span><select id="yeet-growth-period">${periods.map(days => `<option value="${days}" ${growthDays === days ? 'selected' : ''} ${available(days) ? '' : 'disabled'}>Last ${days} days${!available(days) ? ' · more history needed' : ''}</option>`).join('')}</select></label></div><p class="yeet-section-description">${comparison ? `${shortDate(comparison.start)} – ${date(comparison.end)} compared with ${shortDate(comparison.previousStart)} – ${date(comparison.previousEnd)}` : 'Daily reports are needed to compare periods.'}</p><div class="yeet-growth-grid">${metrics.map(([key, label, unit]) => growthCard(performance.studio ? metricPerformance(performance, key) : performance, growthDays, key, label, unit)).join('')}</div><div class="yeet-period-legend"><span><i></i>Latest ${growthDays} days</span><span><i></i>Previous ${growthDays} days</span></div>`;
+}
+
+function studioHistoryContent(performance) {
+  const available = studioMetricDefinitions.filter(([key]) => performance.daily.some(row => Number.isFinite(row[key])));
+  if (!available.some(([key]) => key === studioMetric)) studioMetric = available[0]?.[0] || 'views';
+  const selected = metricPerformance(performance, studioMetric), points = trendPoints(selected, studioMetric, studioDays);
+  const finite = points.filter(row => Number.isFinite(row.value));
+  const additive = ['views', 'profileViews', 'likes', 'comments', 'shares', 'netFollowers'].includes(studioMetric);
+  const value = additive ? finite.reduce((sum, row) => sum + row.value, 0) : finite.at(-1)?.value;
+  const shown = points.length ? { start: points[0].date, end: points.at(-1).date } : selected.dateRange;
+  return `<article class="yeet-panel yeet-history-panel"><div class="yeet-panel-heading"><div><h3>TikTok Studio</h3><p>${rangeLabel(shown)} · timezone not specified by export</p></div><strong>${compact(finite.length ? value : null)}<small>${additive ? 'reported total' : 'latest reported day'}</small></strong></div><div class="yeet-studio-chart-controls"><label><span class="sr-only">TikTok Studio metric</span><select id="yeet-studio-metric">${available.map(([key, label]) => `<option value="${key}" ${key === studioMetric ? 'selected' : ''}>${label}</option>`).join('')}</select></label><label><span class="sr-only">TikTok Studio graph period</span><select id="yeet-studio-period">${[7, 28, 90, 365].map(days => `<option value="${days}" ${days === studioDays ? 'selected' : ''}>Last ${days} days</option>`).join('')}</select></label></div><div id="yeet-history-chart">${cumulativeChart(selected, { metric: studioMetric, days: studioDays, cumulative: false })}</div><p class="yeet-chart-note">${finite.length} days with reported values. Missing values remain gaps. Daily viewer counts are not added into a period’s unique audience.</p></article>`;
+}
+
+function studioAudienceContent(supplement) {
+  const entries = supplement.audience || [];
+  const populations = [...new Set(entries.map(entry => entry.population))];
+  if (!populations.length) return '';
+  if (!populations.includes(audiencePopulation)) audiencePopulation = populations.includes('viewers') ? 'viewers' : populations[0];
+  const selected = entries.filter(entry => entry.population === audiencePopulation).sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt));
+  const category = key => selected.find(entry => entry[key]?.length);
+  const bars = key => {
+    const entry = category(key);
+    if (!entry) return '<p class="yeet-muted">This breakdown has not been returned.</p>';
+    const rows = key === 'country' ? [...entry[key]].sort((a, b) => studioPercentage(b).width - studioPercentage(a).width).slice(0, 8) : entry[key];
+    const caption = audiencePopulation === 'followers' ? `Current followers · captured ${date(entry.capturedAt)}` : rangeLabel(entry.dateRange);
+    return `<p class="yeet-studio-audience-period">${escapeHTML(caption)}</p>${studioPercentageBars(rows, key === 'country' ? countryName : value => value)}`;
+  };
+  return `<div class="yeet-audience-toolbar"><label><span>Audience</span><select id="yeet-audience-population">${populations.map(value => `<option value="${value}" ${value === audiencePopulation ? 'selected' : ''}>${value === 'viewers' ? 'Viewers' : 'Followers'}</option>`).join('')}</select></label><span>TikTok Studio · manually imported</span></div><div class="yeet-audience-grid"><article class="yeet-panel yeet-country-panel"><div class="yeet-panel-heading"><h3>Top countries</h3></div>${bars('country')}</article><div class="yeet-demographic-panels"><article class="yeet-panel"><div class="yeet-panel-heading"><h3>Age</h3></div>${bars('age')}</article><article class="yeet-panel"><div class="yeet-panel-heading"><h3>Gender</h3></div>${bars('gender')}</article></div></div><p class="yeet-audience-note">${audiencePopulation === 'viewers' ? 'People who watched within the report’s own dates.' : 'Current follower composition at capture, not a cohort of followers gained during the date range.'} Native percentages are shown unchanged. &lt;1% remains a threshold.</p>`;
+}
+
+function studioTrafficContent(supplement) {
+  const traffic = supplement.trafficSources;
+  if (!traffic?.rows?.length) return '';
+  return `<article class="yeet-panel yeet-studio-traffic"><div class="yeet-panel-heading"><div><h3>Traffic sources</h3><p>${escapeHTML(rangeLabel(traffic.dateRange))} · TikTok Studio</p></div></div>${studioPercentageBars(traffic.rows)}</article>`;
 }
 
 function allTimeContent(channel, performance) {
@@ -370,11 +446,16 @@ function allTimeContent(channel, performance) {
       : metricCard('Likes', metrics.likes, 'Across reported public posts')) +
     metricCard(youtube ? 'Public uploads' : 'Reported posts', youtube ? metrics.videoCount : channel.content?.length,
       youtube ? 'Full episodes + Shorts' : `Captured ${date(channel.capturedAt)}`);
-  const historyPanel = performance ? `<article class="yeet-panel yeet-history-panel"><div class="yeet-panel-heading"><div><h3>Views over time</h3><p>Cumulative reported daily activity${history.length ? ` · ${shortDate(history[0].date)} – ${date(history.at(-1).date)}` : ''}</p></div><strong>${compact(cumulativeViews(performance).filter(row => Number.isFinite(row.value)).at(-1)?.value)}<small>reported views</small></strong></div><div id="yeet-history-chart">${cumulativeChart(performance)}</div><p class="yeet-chart-note">${history.length} reported days · analytics through ${date(performance.dateRange.end)}. Current counters and daily activity have separate dates.</p></article>` : '';
-  return `${sectionHeading}<div class="yeet-stats-grid">${cards}</div>${historyPanel}`;
+  const historyPanel = performance?.studio ? studioHistoryContent(performance) : performance ? `<article class="yeet-panel yeet-history-panel"><div class="yeet-panel-heading"><div><h3>Views over time</h3><p>Cumulative reported daily activity${history.length ? ` · ${shortDate(history[0].date)} – ${date(history.at(-1).date)}` : ''}</p></div><strong>${compact(cumulativeViews(performance).filter(row => Number.isFinite(row.value)).at(-1)?.value)}<small>reported views</small></strong></div><div id="yeet-history-chart">${cumulativeChart(performance)}</div><p class="yeet-chart-note">${history.length} reported days · analytics through ${date(performance.dateRange.end)}. Current counters and daily activity have separate dates.</p></article>` : '';
+  const manualNote = performance?.studio ? `<p class="yeet-studio-source-note">Video counters refresh automatically. TikTok Studio charts use a manual report captured ${date(performance.capturedAt)}. Refresh keeps that report until a newer Studio import is saved.</p>` : '';
+  return `${sectionHeading}<div class="yeet-stats-grid">${cards}</div>${manualNote}${historyPanel}`;
 }
 
 function audienceContent(channel) {
+  if (channel?.id === 'tiktok' && channel.studioSupplement) {
+    const content = studioAudienceContent(channel.studioSupplement);
+    if (content) return content + studioTrafficContent(channel.studioSupplement);
+  }
   if (channel?.id === 'instagram' && channel.nativeAudience) return nativeAudienceContent(channel.nativeAudience);
   const audience = channel?.audience, label = sourceName(channel);
   if (!audience?.country?.report && !audience?.demographics?.report) return `<div class="yeet-panel yeet-availability"><h3>${escapeHTML(label)} demographics</h3><p>${hasSourceSnapshot(channel) ? 'An audience report has not been returned for this connection.' : 'Audience data will appear when this account is connected and the platform supplies it.'}</p></div>`;
@@ -399,8 +480,12 @@ function render() {
   const platform = socialPlatforms.find(item => item.id === selectedSource);
   document.querySelector('#workspace').innerHTML = `${sidebar()}<div class="app yeet-app"><header class="topbar"><div class="yeet-topbar-title"><div class="yeet-header-logo"><img src="/assets/yeet-logo.svg" width="1561" height="417" alt="YEET"></div><span>Performance report</span></div><div class="top-actions"><span id="yeet-refresh"></span></div></header><main id="main" class="yeet-page"><div class="yeet-page-heading"><div><p class="yeet-eyebrow">SCRAN & PINTS × YEET</p><h1>The numbers.</h1></div><span class="yeet-source-pill">YouTube · Instagram · TikTok</span></div>${sourceSummary()}<div class="yeet-platform-heading">${sourceTabs()}<span>${escapeHTML(platform.detail)}</span></div><section aria-labelledby="yeet-all-time" class="yeet-section">${allTimeContent(channel, performance)}</section><section id="yeet-growth" class="yeet-section" aria-label="Growth">${growthContent(performance)}</section><section class="yeet-section" aria-labelledby="yeet-audience"><div class="yeet-section-heading"><div><span class="yeet-section-number">03</span><h2 id="yeet-audience">Audience</h2></div></div>${audienceContent(channel)}</section><footer class="yeet-footer"><p>Each platform shows its own reporting coverage. YouTube includes Shorts; views and followers are not unique people across accounts.</p><a href="https://scranpints.com" target="_blank" rel="noreferrer">scranpints.com ↗</a></footer></main></div>`;
   renderRefresh(); bindGrowth();
+  document.querySelector('#yeet-studio-metric')?.addEventListener('change', event => { studioMetric = event.target.value; render(); });
+  document.querySelector('#yeet-studio-period')?.addEventListener('change', event => { studioDays = Number(event.target.value); render(); });
+  document.querySelector('#yeet-audience-population')?.addEventListener('change', event => { audiencePopulation = event.target.value; render(); });
   document.querySelectorAll('[data-yeet-source]').forEach(button => button.addEventListener('click', () => {
     selectedSource = button.dataset.yeetSource;
+    if (!(source()?.studioSupplement ? [7, 28, 90, 365] : [7, 14, 28]).includes(growthDays)) growthDays = 7;
     render();
     document.querySelector('.yeet-platform-tabs button[aria-pressed="true"]')?.focus({ preventScroll: true });
   }));
@@ -410,6 +495,7 @@ function render() {
 function bindGrowth() {
   document.querySelector('#yeet-growth-period')?.addEventListener('change', event => {
     growthDays = Number(event.target.value);
+    if (source()?.studioSupplement) { render(); return; }
     const section = document.querySelector('#yeet-growth');
     section.innerHTML = growthContent(sourcePerformance(source()));
     bindGrowth(); window.SPSelect?.refresh(section);
@@ -424,5 +510,10 @@ catch {
 let resizeFrame;
 window.addEventListener('resize', () => {
   clearTimeout(resizeFrame);
-  resizeFrame = setTimeout(() => { const chart = document.querySelector('#yeet-history-chart'); if (chart && report) chart.innerHTML = cumulativeChart(sourcePerformance(source())); }, 120);
+  resizeFrame = setTimeout(() => {
+    const chart = document.querySelector('#yeet-history-chart'), performance = sourcePerformance(source());
+    if (chart && report) chart.innerHTML = performance?.studio
+      ? cumulativeChart(metricPerformance(performance, studioMetric), { metric: studioMetric, days: studioDays, cumulative: false })
+      : cumulativeChart(performance);
+  }, 120);
 });

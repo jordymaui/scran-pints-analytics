@@ -1,3 +1,4 @@
+import { normalizeTikTokStudioCSVs } from '/lib/tiktok-studio.mjs';
 const $ = selector => document.querySelector(selector);
 const sourceIds = ['youtube', 'youtube-shorts', 'instagram', 'tiktok'];
 const sourceNames = { youtube: 'YouTube', 'youtube-shorts': 'YouTube Shorts', instagram: 'Instagram', tiktok: 'TikTok' };
@@ -39,6 +40,7 @@ let current = null;
 let busySource = null;
 let statusPending = false;
 let teamAccess = false;
+let reviewedStudioReport = null;
 
 function setTeamAccess(allowed) {
   teamAccess = allowed === true;
@@ -103,7 +105,97 @@ function renderStatus() {
     connect.textContent = `${platforms.get(id)?.connected ? 'Reconnect' : 'Connect'} ${sourceNames[id]} ↗`;
   }
   $('#reload-status').disabled = !!busySource || statusPending;
+  document.querySelectorAll('#studio-import-form input,#studio-import-review').forEach(input => { input.disabled = !teamAccess || !!busySource || statusPending; });
+  $('#studio-import-save').disabled = !teamAccess || !reviewedStudioReport || !!busySource || statusPending;
 }
+
+const studioImportErrors = {
+  invalid_studio_report: 'The report could not be validated. Check the selected CSV files and their date windows.',
+  tiktok_snapshot_required: 'Refresh the connected TikTok account before importing its Studio report.',
+  studio_import_stale: 'A newer Studio report is already saved. The existing report was kept.',
+  newer_snapshot_exists: 'TikTok reporting changed during this import. Review the latest data before retrying.',
+  sync_in_progress: 'TikTok is already refreshing. Wait for it to finish, then publish this reviewed report.',
+  payload_too_large: 'The prepared report is larger than the 2 MB import limit.',
+  sync_unavailable: 'Shared reporting storage is unavailable. The previous report was kept.',
+};
+function studioImportMessage(text, success = false) {
+  const element = $('#studio-import-message');
+  element.hidden = false; element.textContent = text; element.classList.toggle('success', success);
+}
+function clearStudioReview() {
+  reviewedStudioReport = null;
+  $('#studio-import-preview').hidden = true;
+  $('#studio-import-publish').hidden = true;
+  $('#studio-import-save').disabled = true;
+}
+function previewStudioReport(report) {
+  const performance = report.performance;
+  const metric = value => Number.isFinite(value) ? new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 }).format(value) : 'Unavailable';
+  const windowLabel = range => `${range.start} → ${range.end}`;
+  const metrics = [['Views', performance.totals.views], ['Profile views', performance.totals.profileViews],
+    ['Likes', performance.totals.likes], ['Comments', performance.totals.comments], ['Shares', performance.totals.shares], ['Net followers', performance.totals.netFollowers]];
+  $('#studio-import-preview').innerHTML = `<h3>Review @${escapeHTML(report.accountUsername)}</h3><div class="studio-import-preview-stats">${metrics.map(([label, value]) => `<div><span>${label}</span><strong>${metric(value)}</strong></div>`).join('')}</div><dl><div><dt>Export downloaded</dt><dd>${escapeHTML(performance.capturedAt.slice(0, 10))}</dd></div><div><dt>Overview and followers</dt><dd>${escapeHTML(windowLabel(performance.seriesRanges.overview))}</dd></div><div><dt>Viewers</dt><dd>${escapeHTML(windowLabel(performance.seriesRanges.viewers))}</dd></div><div><dt>Daily report rows</dt><dd>${performance.daily.length}</dd></div><div><dt>Follower breakdowns in this import</dt><dd>${report.audience.some(entry => entry.population === 'followers') ? 'Included where exported' : 'Not included'}</dd></div></dl><p>Daily viewer counts are not added into a unique audience total. Missing values and &lt;1% thresholds are preserved.</p>`;
+  $('#studio-import-preview').hidden = false;
+  $('#studio-import-publish').hidden = false;
+}
+
+export function studioCaptureTimestamp(day, time, importedAt) {
+  const capture = `${day}T${time.length === 5 ? `${time}:00` : time}Z`;
+  const timestamp = Date.parse(capture);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(capture) || !Number.isFinite(timestamp) ||
+      new Date(timestamp).toISOString().slice(0, 10) !== day || timestamp > Date.parse(importedAt)) {
+    throw Error('Enter the actual export download date and UTC time, no later than now.');
+  }
+  return new Date(timestamp).toISOString();
+}
+
+export async function publishStudioImport(report, request = fetch) {
+  const body = JSON.stringify({ operation: 'studio-import', report });
+  if (new TextEncoder().encode(body).byteLength > 2_000_000) throw Error(studioImportErrors.payload_too_large);
+  const response = await request('/api/sync?source=tiktok', { method: 'POST', credentials: 'same-origin', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body });
+  let result;
+  try { result = await response.json(); } catch { result = {}; }
+  return { ok: response.ok, status: response.status, result };
+}
+
+$('#studio-import-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!teamAccess || busySource || !$('#studio-import-form').reportValidity()) return;
+  clearStudioReview();
+  busySource = 'studio-review'; renderStatus();
+  try {
+    const selected = [...$('#studio-import-files').files];
+    if (selected.reduce((sum, file) => sum + file.size, 0) > 2_000_000) throw Error('Choose CSV exports totalling less than 2 MB.');
+    const files = await Promise.all(selected.map(async file => ({ name: file.name, text: await file.text() })));
+    const importedAt = new Date().toISOString();
+    const capturedAt = studioCaptureTimestamp($('#studio-capture-date').value, $('#studio-capture-time').value, importedAt);
+    reviewedStudioReport = normalizeTikTokStudioCSVs({ files, capturedAt, importedAt, accountUsername: 'scranpints',
+      overviewRange: { start: $('#studio-overview-start').value, end: $('#studio-overview-end').value, timezone: null },
+      viewersRange: { start: $('#studio-viewers-start').value, end: $('#studio-viewers-end').value, timezone: null } });
+    previewStudioReport(reviewedStudioReport);
+    studioImportMessage('Review the dates and totals below before publishing.');
+  } catch (error) { studioImportMessage(error?.message || 'The CSV report could not be read.'); }
+  finally { busySource = null; renderStatus(); }
+});
+const importFormOpenedAt = new Date().toISOString();
+$('#studio-capture-date').value = importFormOpenedAt.slice(0, 10);
+$('#studio-capture-date').max = importFormOpenedAt.slice(0, 10);
+$('#studio-capture-time').value = importFormOpenedAt.slice(11, 19);
+document.querySelectorAll('#studio-import-form input').forEach(input => input.addEventListener('change', clearStudioReview));
+$('#studio-import-save').addEventListener('click', async () => {
+  if (!teamAccess || !reviewedStudioReport || busySource) return;
+  busySource = 'studio-import'; renderStatus();
+  studioImportMessage('Saving the reviewed Studio report…');
+  try {
+    const response = await publishStudioImport(reviewedStudioReport);
+    if ([401, 403].includes(response.status)) { setTeamAccess(false); studioImportMessage('Team sign-in expired. The reviewed report has not been published.'); return; }
+    if (response.ok && response.result.status === 'imported') {
+      studioImportMessage('Studio report published. Its dated charts and audience data are now available on the dashboard and YEET.', true);
+      clearStudioReview();
+    } else studioImportMessage(studioImportErrors[response.result.error || response.result.errorCode] || 'The report could not be saved. The previous report was kept.');
+  } catch (error) { studioImportMessage(error?.message || 'The save could not be confirmed. Check the dashboard before retrying.'); }
+  finally { busySource = null; await loadStatus(); renderStatus(); }
+});
 
 async function loadStatus({ showCallback = false } = {}) {
   if (statusPending) return;
