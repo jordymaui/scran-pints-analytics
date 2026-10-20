@@ -1,5 +1,3 @@
-import { createReportRefresh } from '/refresh.js';
-
 const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, character =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const number = value => Number.isFinite(value) ? new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 }).format(value) : '—';
@@ -138,16 +136,33 @@ function genderChart(entry) {
   return `<div class="yeet-gender-chart"><div class="yeet-gender-track" aria-hidden="true">${groups.map((row, index) => `<i class="yeet-gender-${index}" style="width:${Math.min(100, row.value)}%"></i>`).join('')}</div><div class="yeet-gender-legend">${groups.map((row, index) => `<div><i class="yeet-gender-${index}" aria-hidden="true"></i><span>${escapeHTML(labels[row.key] || row.key)}</span><strong>${number(row.value)}%</strong></div>`).join('')}</div></div>`;
 }
 
-let report = null, growthDays = 7;
+let report = null, growthDays = 7, refreshing = false, refreshMessage = '';
 const source = () => report?.sources?.find(item => item.id === 'youtube-longform');
-const reportRefresh = createReportRefresh({
-  getCoverage: () => {
-    const channel = source(), performance = channel?.performance;
-    return [...(performance ? [{ label: 'YouTube Analytics · all formats', ...performance.dateRange, capturedAt: performance.capturedAt }] : []),
-      ...(channel?.counterScope === 'public-channel' ? [{ label: 'YouTube public counters', kind: 'counters', capturedAt: channel.capturedAt }] : [])];
-  },
-  reloadReport: async () => { const updated = await loadReport(); report = updated; render(); },
-});
+function renderRefresh() {
+  const host = document.querySelector('#yeet-refresh');
+  if (!host) return;
+  host.innerHTML = `<button type="button" class="report-refresh-trigger ${refreshing ? 'is-refreshing' : ''}" aria-label="Refresh YEET report" ${refreshing ? 'disabled' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 6.1A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.9 5.9"/></svg><span>${refreshing ? 'Refreshing…' : 'Refresh'}</span></button><span class="yeet-refresh-status" role="status" aria-live="polite">${escapeHTML(refreshMessage)}</span>`;
+  host.querySelector('button').addEventListener('click', refreshReport);
+}
+
+async function refreshReport() {
+  if (refreshing) return;
+  refreshing = true;
+  refreshMessage = 'Loading latest saved report…';
+  renderRefresh();
+  try {
+    const updated = await loadReport();
+    report = updated;
+    refreshMessage = 'Latest saved report loaded.';
+    render();
+  } catch {
+    refreshMessage = 'Refresh failed. Your previous report is still shown.';
+  } finally {
+    refreshing = false;
+    renderRefresh();
+    document.querySelector('#yeet-refresh button')?.focus({ preventScroll: true });
+  }
+}
 
 async function loadReport() {
   const response = await fetch('/api/report', { cache: 'no-store' });
@@ -167,7 +182,7 @@ function render() {
   const channel = source(), performance = channel?.performance, publicCounters = channel?.counterScope === 'public-channel' ? channel.metrics : null;
   const audience = channel?.audience, history = performance?.daily?.filter(row => Number.isFinite(row.views)) || [];
   document.querySelector('#workspace').innerHTML = `${sidebar()}<div class="app yeet-app"><header class="topbar"><div class="yeet-topbar-title"><div class="yeet-header-logo"><img src="/assets/yeet-logo.svg" width="1561" height="417" alt="YEET"></div><span>Performance report</span></div><div class="top-actions"><span id="yeet-refresh"></span></div></header><main id="main" class="yeet-page"><div class="yeet-page-heading"><div><p class="yeet-eyebrow">SCRAN & PINTS × YEET</p><h1>The numbers.</h1></div><span class="yeet-source-pill"><span class="yt-mark" aria-hidden="true">▶</span>YouTube · all formats</span></div><section aria-labelledby="yeet-all-time" class="yeet-section"><div class="yeet-section-heading"><div><span class="yeet-section-number">01</span><h2 id="yeet-all-time">All-time performance</h2></div></div><div class="yeet-stats-grid">${metricCard('Lifetime views', publicCounters?.views, `Public counter · ${date(channel?.capturedAt)}`)}${metricCard('Subscribers', publicCounters?.followers, `Current total · ${date(channel?.capturedAt)}`)}${metricCard('Watch time', performance?.totals?.watchHours, performance ? rangeLabel(performance.dateRange) : 'Analytics report unavailable', 'h')}${metricCard('Public uploads', publicCounters?.videoCount, 'Full episodes + Shorts')}</div><article class="yeet-panel yeet-history-panel"><div class="yeet-panel-heading"><div><h3>Views over time</h3><p>Cumulative reported views${history.length ? ` · ${shortDate(history[0].date)} – ${date(history.at(-1).date)}` : ''}</p></div><strong>${compact(cumulativeViews(performance).filter(row => Number.isFinite(row.value)).at(-1)?.value)}<small>reported views</small></strong></div><div id="yeet-history-chart">${cumulativeChart(performance)}</div><p class="yeet-chart-note">${history.length ? `${history.length} reported days. ` : ''}Analytics through ${date(performance?.dateRange?.end)}; current public counters are shown above.</p></article></section><section id="yeet-growth" class="yeet-section" aria-label="Growth">${growthContent(performance)}</section><section class="yeet-section" aria-labelledby="yeet-audience"><div class="yeet-section-heading"><div><span class="yeet-section-number">03</span><h2 id="yeet-audience">Audience</h2></div></div><div class="yeet-audience-grid"><article class="yeet-panel yeet-country-panel"><div class="yeet-panel-heading"><div><h3>Top countries</h3><p>${escapeHTML(reportNote(audience?.country))}</p></div></div>${countryChart(audience?.country)}</article><div class="yeet-demographic-panels"><article class="yeet-panel"><div class="yeet-panel-heading"><div><h3>Age</h3><p>${escapeHTML(reportNote(audience?.demographics))}</p></div></div>${ageChart(audience?.demographics)}</article><article class="yeet-panel"><div class="yeet-panel-heading"><div><h3>Gender</h3></div></div>${genderChart(audience?.demographics)}</article></div></div><p class="yeet-audience-note">Age and gender show YouTube’s reported viewer percentages. Small groups may be withheld; percentages may not total 100%.</p></section><footer class="yeet-footer"><p>Channel performance across YouTube and Shorts. These figures are not attributed to individual YEET placements.</p><a href="https://scranpints.com" target="_blank" rel="noreferrer">scranpints.com ↗</a></footer></main></div>`;
-  reportRefresh.mount(document.querySelector('#yeet-refresh'));
+  renderRefresh();
   bindGrowth();
   window.SPSelect?.refresh(document.querySelector('#workspace'));
 }
