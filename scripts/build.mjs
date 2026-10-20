@@ -12,6 +12,8 @@ export const PUBLIC_OUTPUT = resolve(ROOT, 'public-dist');
 export const PUBLIC_FILES = Object.freeze([
   'index.html', 'sponsor.html', 'dashboard.js', 'dashboard.css', 'brand-tokens.css',
   'controls.js', 'controls.css', 'date-picker.js', 'date-picker.css',
+  'refresh.js', 'refresh.css',
+  'upload-analytics.js', 'upload-analytics.css',
   'workshop.html', 'workshop.js', 'workshop.css',
   'login.html', 'login.js', 'login.css', 'favicon.png',
   'connections.html', 'connections.js', 'connections.css',

@@ -1,0 +1,80 @@
+.studio .upload-analytics {min-width:0}
+.studio .upload-analytics [hidden] {display:none!important}
+.studio .upload-analytics :is(h2,h3,h4) {margin:0 0 10px}
+.studio .upload-analytics h2 {font-size:30px}
+.studio .upload-analytics h3 {font-size:24px;line-height:1.35;overflow-wrap:anywhere}
+.studio .upload-analytics h4 {font-size:17px;margin-top:22px}
+.studio .ua-heading {display:flex;justify-content:space-between;align-items:start;gap:20px;margin-bottom:16px}
+.studio .ua-heading>div {min-width:0}
+.studio .ua-heading .eyebrow {margin:0 0 8px;color:var(--red)}
+.studio .ua-actions {display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0}
+.studio .ua-note {font:14px/1.65 var(--brand-body,Arial,sans-serif);color:var(--muted);margin:9px 0 15px}
+.studio .ua-coverage {display:flex;flex-wrap:wrap;gap:8px 22px;padding:17px 20px;background:var(--cream);border:1px solid var(--line);border-left:4px solid var(--red);border-radius:7px;margin-bottom:20px;font:13px/1.7 var(--mono)}
+.studio .ua-coverage strong {width:100%;font:600 17px var(--brand-body,Arial,sans-serif)}
+.studio .ua-controls {display:flex;align-items:end;flex-wrap:wrap;gap:16px;margin:18px 0}
+.studio .ua-controls label,.studio .ua-heading>label {display:flex;flex-direction:column;min-width:150px;max-width:100%;gap:6px}
+.studio .ua-controls .ua-search {flex:1;min-width:230px}
+.studio .upload-analytics .sp-select {width:100%;min-width:0;max-width:100%}
+.studio .ua-controls select {width:220px}
+.studio .ua-heading select {width:260px}
+.studio .ua-controls input {width:100%}
+.studio .upload-analytics button:disabled {opacity:.5;cursor:not-allowed}
+.studio .ua-table-scroll {overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:7px;background:var(--cream)}
+.studio .ua-catalog {max-height:640px}
+.studio .ua-table-scroll table {width:100%;border-collapse:collapse}
+.studio .ua-table-scroll th,.studio .ua-table-scroll td {padding:14px 15px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font:14px/1.6 var(--brand-body,Arial,sans-serif);font-variant-numeric:tabular-nums;white-space:nowrap}
+.studio .ua-table-scroll thead th {position:sticky;top:0;z-index:1;background:var(--paper);color:var(--muted);font-weight:500}
+.studio .ua-table-scroll tbody tr:last-child :is(th,td) {border-bottom:0}
+.studio .ua-table-scroll small {display:block;color:var(--muted);font:12px/1.6 var(--mono);margin-top:4px}
+.studio .ua-catalog td:last-child {min-width:220px;white-space:normal}
+.studio .ua-catalog th:first-child {min-width:350px;width:40%}
+.studio .ua-video {display:flex;align-items:start;gap:13px;text-align:left;border:0;background:transparent;padding:0;color:var(--ink);cursor:pointer;font:600 15px/1.5 var(--brand-body,Arial,sans-serif);max-width:520px;white-space:normal}
+.studio .ua-video:hover {color:var(--red)}
+.studio .ua-video img {width:100px;aspect-ratio:16/9;object-fit:cover;border:1px solid var(--line);border-radius:4px;flex:none}
+.studio .ua-video span {overflow-wrap:anywhere}
+.studio .ua-selected {background:#fbe1d855}
+.studio .ua-selected .ua-video {color:var(--red)}
+.studio .ua-select-prompt {padding:16px 0}
+.studio .ua-detail,.studio .ua-channel {margin-top:30px;padding-top:25px;border-top:2px solid var(--line)}
+.studio .ua-report-status {display:flex;flex-wrap:wrap;gap:5px 18px;font:13px/1.65 var(--mono);color:var(--muted);padding:12px 0}
+.studio .ua-report-status strong {color:var(--ink);font-weight:600}
+.studio .ua-metrics {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:7px;margin:18px 0;background:var(--cream)}
+.studio .ua-metrics>div {padding:16px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.studio .ua-metrics dt {font:13px/1.6 var(--brand-body,Arial,sans-serif);color:var(--muted)}
+.studio .ua-metrics dd {font:600 27px/1.4 var(--brand-body,Arial,sans-serif);margin:8px 0 0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.studio .ua-metadata {border:1px solid var(--line);border-radius:7px;padding:17px;margin:18px 0;font:14px/1.7 var(--brand-body,Arial,sans-serif)}
+.studio .ua-metadata summary {cursor:pointer;font-weight:600;overflow-wrap:anywhere}
+.studio .ua-metadata details {padding:12px 0;border-top:1px solid var(--line)}
+.studio .ua-history-thumbnail {display:block;width:min(320px,100%);height:auto;aspect-ratio:16/9;object-fit:contain;margin:15px 0;border:1px solid var(--line);border-radius:5px}
+.studio .ua-description {white-space:pre-wrap;overflow-wrap:anywhere;max-height:350px;overflow:auto}
+.studio .ua-chart {width:100%;height:auto;display:block;background:var(--cream);border:1px solid var(--line);border-radius:7px;min-height:210px}
+.studio .ua-chart line {stroke:var(--line)}
+.studio .ua-chart text {font:12px var(--brand-body,Arial,sans-serif);fill:var(--muted)}
+.studio .ua-chart polyline {fill:none;stroke:var(--red);stroke-width:2;vector-effect:non-scaling-stroke}
+.studio .ua-chart circle {fill:var(--red)}
+.studio .ua-pagination {display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;font:12px/1.6 var(--mono);color:var(--muted);margin:12px 0}
+.studio .ua-pagination .button {font-size:13px;padding:7px 10px}
+.studio .ua-empty {border:1px dashed var(--line);border-radius:7px;padding:22px;font:15px/1.75 var(--brand-body,Arial,sans-serif);color:var(--muted);background:var(--cream)}
+.ua-sr-only {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:1100px) {
+  .studio .ua-heading {flex-wrap:wrap}
+  .studio .ua-actions {justify-content:flex-start;flex-shrink:1}
+  .studio .ua-metrics {grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:680px) {
+  .studio .upload-analytics h2 {font-size:25px}
+  .studio .upload-analytics h3 {font-size:21px}
+  .studio .ua-controls {gap:12px}
+  .studio .ua-controls label,.studio .ua-heading>label,.studio .ua-controls .ua-search {width:100%;min-width:0}
+  .studio .ua-controls select,.studio .ua-heading select {width:100%}
+  .studio .ua-metrics {grid-template-columns:repeat(2,minmax(0,1fr))}
+  .studio .ua-metrics>div {padding:13px}
+  .studio .ua-metrics dd {font-size:24px}
+  .studio .ua-chart {min-height:180px}
+  .studio .ua-chart text {font-size:14px}
+  .studio .ua-catalog th:first-child {min-width:270px}
+  .studio .ua-video img {width:75px}
+  .studio .ua-table-scroll th,.studio .ua-table-scroll td {padding:11px 12px;font-size:13px}
+  .studio .ua-coverage {padding:14px}
+  .studio .ua-actions .button {font-size:13px}
+}

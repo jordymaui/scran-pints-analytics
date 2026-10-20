@@ -41,7 +41,7 @@ function shortsAnalytics() {
     daily: [{ day: '2026-10-16', views: 730000111 }], content: [],
   };
 }
-const privatePattern = /channelAnalytics|shortsAnalytics|channelBreakdowns|viewerPercentage|730000112|73000022[12]|37\.123456|PRIVATE_EVIDENCE/;
+const privatePattern = /channelAnalytics|shortsAnalytics|channelBreakdowns|viewerPercentage|73000022[12]|37\.123456|PRIVATE_EVIDENCE/;
 
 test('only selected channel and Shorts performance enters public output; raw reports and audiences stay excluded', async () => {
   for (const mode of ['current', 'missing-public', 'invalid-public']) {
@@ -66,9 +66,10 @@ test('only selected channel and Shorts performance enters public output; raw rep
     assert.equal(report.sources[0].performance.totals.views, 730000001);
     assert.equal(report.sources[0].performance.capturedAt, PRIVATE_CAPTURE);
     assert.equal(report.sources[1].performance.totals.views, 730000111);
+    assert.equal(report.sources[1].performance.totals.engagedViews, 730000112);
     assert.equal(report.sources[1].performance.capturedAt, SHORTS_CAPTURE);
     assert.equal(report.sources[1].performance.daily[0].watchHours, null);
-    assert.equal(report.sources[1].metrics.engagedViews, null);
+    assert.equal(report.sources[1].metrics.engagedViews, 730000112);
     assert.equal(report.sources[0].capturedAt, mode === 'current' ? publicYouTubeFixture().capturedAt : PRIVATE_CAPTURE);
     assert.equal(report.sources[0].snapshotOrigin, 'cloud');
     assert.equal(report.sources[0].metrics.views, mode === 'current' ? 987654 : 730000001);

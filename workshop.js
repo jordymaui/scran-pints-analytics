@@ -1,5 +1,7 @@
 import { windowMetrics, groupTests, metadataAudit, validateNotebook, mergeNotebookChanges, workshopThumbnail, workshopPackage, analyticsMetrics, analyticsDailySeries } from '/lib/workshop-model.mjs';
 import { csvCell } from '/lib/report-model.mjs';
+import { createReportRefresh } from '/refresh.js';
+import { mountUploadAnalytics } from '/upload-analytics.js';
 
 const $ = selector => document.querySelector(selector);
 const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -26,6 +28,15 @@ let windowDays = 3;
 let teamAccess = false;
 let studioReady = false;
 let notebookBound = false;
+const reportRefresh = createReportRefresh({
+  getCoverage: () => [
+    ...(data?.channelAnalytics ? [{ label: 'Channel Analytics · all formats', ...data.channelAnalytics.dateRange, capturedAt: data.channelAnalytics.capturedAt }] : []),
+    ...(data?.shortsAnalytics ? [{ label: 'YouTube Shorts Analytics', ...data.shortsAnalytics.dateRange, capturedAt: data.shortsAnalytics.capturedAt }] : []),
+    ...(data?.apiThrough ? [{ label: `${data.videos.length} included episodes`, end: data.apiThrough, capturedAt: data.capturedAt }] : []),
+  ],
+  reloadReport: reloadStudioReporting,
+  onTeamAccess: allowed => { teamAccess = allowed; updateTeamControls(); },
+});
 
 function updateTeamControls() {
   document.body.classList.toggle('team-access', teamAccess);
@@ -70,6 +81,12 @@ const analyticsFields = [
   ['subscribersGained', 'Subscribers gained', 0], ['subscribersLost', 'Subscribers lost', 0],
   ['subscribersNet', 'Net subscribers', 0],
 ];
+const shortsFields = [
+  ['views', 'Views', 0], ['engagedViews', 'Engaged views', 0], ['watchHours', 'Watch hours', 1],
+  ['likes', 'Likes', 0], ['comments', 'Comments', 0], ['shares', 'Shares', 0],
+  ['subscribersGained', 'Subscribers gained', 0], ['subscribersLost', 'Subscribers lost', 0], ['subscribersNet', 'Net subscribers', 0],
+];
+let shortsMetric = 'views', shortsLimit = 28;
 const channelBreakdownViews = {
   traffic: { label: 'Traffic sources', dimensions: [['insightTrafficSourceType', 'Traffic source']],
     note: 'How viewers reached the channel’s videos, using YouTube’s native source categories.' },
@@ -101,24 +118,39 @@ function reportDates(report) {
 function metricLedger(metrics, fields = analyticsFields) {
   return `<dl class="analytics-metrics">${fields.map(field => `<div><dt>${escapeHTML(field[1])}</dt><dd>${escapeHTML(metricValue(metrics, field))}</dd></div>`).join('')}</dl>`;
 }
-function analyticsTrend(rows, range, label, key, limit = 28, viewsOnly = false) {
-  const series = analyticsDailySeries(rows, range, limit);
+function analyticsTrend(rows, range, label, key, limit = 28, isShorts = false) {
+  const fields = isShorts ? shortsFields : analyticsFields;
+  const chartField = isShorts ? shortsFields.find(field => field[0] === shortsMetric) || shortsFields[0] : analyticsFields[0];
+  const [chartKey, chartLabel, chartDigits] = chartField;
+  const nativeRows = isShorts ? rows.map(row => ({ ...row,
+    estimatedMinutesWatched: Number.isFinite(row.watchHours) ? row.watchHours * 60 : null,
+  })) : rows;
+  const series = analyticsDailySeries(nativeRows, range, limit);
+  if (isShorts) {
+    const originals = new Map();
+    for (const row of rows) originals.set(row.day, originals.has(row.day) ? null : row);
+    for (const row of series) {
+      const original = originals.get(row.day);
+      row.engagedViews = Number.isFinite(original?.engagedViews) ? original.engagedViews : null;
+      if (Number.isFinite(original?.subscribersNet)) row.subscribersNet = original.subscribersNet;
+    }
+  }
   if (!series.length) return '<p class="empty">No dated daily report was collected.</p>';
-  const present = series.filter(row => Number.isFinite(row.views));
-  const maximum = Math.max(1, ...present.map(row => row.views));
+  const present = series.filter(row => Number.isFinite(row[chartKey]));
+  const minimum = Math.min(0, ...present.map(row => row[chartKey]));
+  const maximum = Math.max(1, ...present.map(row => row[chartKey]));
   const x = index => 62 + (series.length === 1 ? .5 : index / (series.length - 1)) * 790;
-  const y = value => 205 - value / maximum * 170;
+  const y = value => 205 - (value - minimum) / (maximum - minimum) * 170;
   const segments = [];
   let points = [];
   series.forEach((row, index) => {
-    if (row.views === null) { if (points.length) segments.push(points); points = []; }
-    else points.push([x(index), y(row.views), row]);
+    if (!Number.isFinite(row[chartKey])) { if (points.length) segments.push(points); points = []; }
+    else points.push([x(index), y(row[chartKey]), row]);
   });
   if (points.length) segments.push(points);
-  const grid = [0, .5, 1].map(fraction => `<line x1="62" x2="852" y1="${y(maximum * fraction)}" y2="${y(maximum * fraction)}" stroke="#e5e3db"/><text x="50" y="${y(maximum * fraction) + 4}" text-anchor="end">${number(maximum * fraction)}</text>`).join('');
-  const chart = present.length ? `<svg viewBox="0 0 900 245" role="img" aria-labelledby="${key}-title ${key}-description"><title id="${key}-title">${escapeHTML(label)} daily views</title><desc id="${key}-description">Returned daily views from ${series[0].day} to ${series.at(-1).day}. Missing dates are gaps. Exact values follow.</desc>${grid}${segments.map(segment => `<polygon points="${segment[0][0]},205 ${segment.map(point => point.slice(0, 2).join(',')).join(' ')} ${segment.at(-1)[0]},205" fill="#c53529" opacity=".06"/><polyline points="${segment.map(point => point.slice(0, 2).join(',')).join(' ')}" fill="none" stroke="#c53529" stroke-width="2.5"/>`).join('')}${series.length <= 90 ? segments.flat().map(([cx, cy, row]) => `<circle cx="${cx}" cy="${cy}" r="3" fill="#c53529"><title>${row.day}: ${number(row.views)} views</title></circle>`).join('') : ''}<text x="62" y="235">${escapeHTML(date(series[0].day))}</text><text x="852" y="235" text-anchor="end">${escapeHTML(date(series.at(-1).day))}</text></svg>` : '<p class="empty">No views were returned for these dates.</p>';
-  const fields = viewsOnly ? analyticsFields.slice(0, 1) : analyticsFields;
-  return `<div class="chart-panel analytics-trend"><div class="section-heading compact"><h4>${escapeHTML(label)} · daily views</h4><label>Chart dates<select data-trend-range="${key}"><option value="7" ${limit === 7 ? 'selected' : ''}>Last 7 dates</option><option value="28" ${limit === 28 ? 'selected' : ''}>Last 28 dates</option><option value="all" ${limit === null ? 'selected' : ''}>All dates · up to 5,000</option></select></label></div>${chart}<p class="note chart-coverage">${present.length} / ${series.length} dates returned · gaps are unavailable. ${limit === null && series[0].day > range.start ? 'Showing the latest 5,000 dates. ' : ''}Cards retain their stated full window.</p><details class="analytics-daily"><summary>Daily values &amp; coverage</summary><p class="note">The date selector changes this chart and table only. Missing dates are not zero.</p><div class="table-scroll" tabindex="0" role="region" aria-label="${escapeHTML(label)} daily values"><table><thead><tr><th scope="col">Date</th>${fields.map(field => `<th scope="col">${escapeHTML(field[1])}</th>`).join('')}<th scope="col">Coverage</th></tr></thead><tbody>${series.map(row => `<tr><td>${row.day}</td>${fields.map(field => `<td class="metric">${escapeHTML(metricValue(row, field))}</td>`).join('')}<td>${row.coverage}</td></tr>`).join('')}</tbody></table></div></details></div>`;
+  const grid = [minimum, (minimum + maximum) / 2, maximum].map(value => `<line x1="62" x2="852" y1="${y(value)}" y2="${y(value)}" stroke="#e5e3db"/><text x="50" y="${y(value) + 4}" text-anchor="end">${number(value, chartDigits)}</text>`).join('');
+  const chart = present.length ? `<svg viewBox="0 0 900 245" role="img" aria-labelledby="${key}-title ${key}-description"><title id="${key}-title">${escapeHTML(label)} daily ${escapeHTML(chartLabel.toLowerCase())}</title><desc id="${key}-description">Returned daily ${escapeHTML(chartLabel.toLowerCase())} from ${series[0].day} to ${series.at(-1).day}. Missing dates are gaps. Exact values follow.</desc>${grid}${segments.map(segment => `<polygon points="${segment[0][0]},${y(0)} ${segment.map(point => point.slice(0, 2).join(',')).join(' ')} ${segment.at(-1)[0]},${y(0)}" fill="#c53529" opacity=".06"/><polyline points="${segment.map(point => point.slice(0, 2).join(',')).join(' ')}" fill="none" stroke="#c53529" stroke-width="2.5"/>`).join('')}${series.length <= 90 ? segments.flat().map(([cx, cy, row]) => `<circle cx="${cx}" cy="${cy}" r="3" fill="#c53529"><title>${row.day}: ${number(row[chartKey], chartDigits)} ${escapeHTML(chartLabel.toLowerCase())}</title></circle>`).join('') : ''}<text x="62" y="235">${escapeHTML(date(series[0].day))}</text><text x="852" y="235" text-anchor="end">${escapeHTML(date(series.at(-1).day))}</text></svg>` : `<p class="empty">No ${escapeHTML(chartLabel.toLowerCase())} were returned for these dates.</p>`;
+  return `<div class="chart-panel analytics-trend"><div class="section-heading compact"><h4>${escapeHTML(label)} · daily ${escapeHTML(chartLabel.toLowerCase())}</h4>${isShorts ? `<label>Metric<select data-trend-metric="shorts">${shortsFields.map(([value, title]) => `<option value="${value}" ${value === shortsMetric ? 'selected' : ''}>${title}</option>`).join('')}</select></label>` : ''}<label>Chart dates<select data-trend-range="${key}"><option value="7" ${limit === 7 ? 'selected' : ''}>Last 7 dates</option><option value="28" ${limit === 28 ? 'selected' : ''}>Last 28 dates</option><option value="all" ${limit === null ? 'selected' : ''}>All dates · up to 5,000</option></select></label></div>${chart}<p class="note chart-coverage">${present.length} / ${series.length} dates have ${escapeHTML(chartLabel.toLowerCase())} · gaps are unavailable. ${limit === null && series[0].day > range.start ? 'Showing the latest 5,000 dates. ' : ''}Cards retain their stated full window.</p><details class="analytics-daily"><summary>Daily values &amp; coverage</summary><p class="note">The date selector changes this chart and table only. Missing dates and uncollected metric fields are not zero.</p><div class="table-scroll" tabindex="0" role="region" aria-label="${escapeHTML(label)} daily values"><table><thead><tr><th scope="col">Date</th>${fields.map(field => `<th scope="col">${escapeHTML(field[1])}</th>`).join('')}<th scope="col">Coverage</th></tr></thead><tbody>${series.map(row => `<tr><td>${row.day}</td>${fields.map(field => `<td class="metric">${escapeHTML(metricValue(row, field))}</td>`).join('')}<td>${row.coverage}</td></tr>`).join('')}</tbody></table></div></details></div>`;
 }
 function renderChannelAnalytics() {
   const report = data.channelAnalytics;
@@ -175,8 +207,8 @@ function renderShortsAnalytics() {
     $('#shorts-analytics').innerHTML = '<div class="notice quiet"><strong>No saved Shorts report is available.</strong><p>Shorts reporting status is available in Connections. No Shorts figures are inferred from the public channel counter or the episode catalog.</p></div>';
     return;
   }
-  const fields = [['views', 'Views', 0], ['engagedViews', 'Engaged views', 0], ['watchHours', 'Watch hours', 1], ['likes', 'Likes', 0], ['comments', 'Comments', 0], ['shares', 'Shares', 0], ['subscribersNet', 'Net subscribers', 0]];
-  $('#shorts-analytics').innerHTML = `<article class="analytics-report"><div class="section-heading compact"><h3>YouTube Shorts</h3><span class="pill">YouTube Analytics</span></div><p class="note">${escapeHTML(reportDates(report))}</p>${metricLedger(report.metrics, fields)}<p class="note">Source: ${escapeHTML(report.provenance.label)}. ${escapeHTML(report.scope)}</p><p class="note">Shorts totals sum returned daily Shorts rows. Views and engaged views are separate source metrics. Daily watch time, subscriber gains/losses and individual-Short records are not retained in this saved report.</p><div id="shorts-trend">${analyticsTrend(report.daily, report.dateRange, 'Shorts', 'shorts', 28, true)}</div></article>`;
+  const limitedRows = report.daily.some(row => shortsFields.some(([field]) => !Number.isFinite(row[field])));
+  $('#shorts-analytics').innerHTML = `<article class="analytics-report"><div class="section-heading compact"><h3>YouTube Shorts</h3><span class="pill">YouTube Analytics</span></div><p class="note">${escapeHTML(reportDates(report))}</p>${metricLedger(report.metrics, shortsFields)}<p class="note">Source: ${escapeHTML(report.provenance?.label || 'YouTube Analytics API')}. ${escapeHTML(report.scope)}</p><p class="note">Shorts totals sum returned daily Shorts rows. Views and engaged views are separate source metrics. ${limitedRows ? 'Some saved daily fields were not collected and remain unavailable. ' : ''}Choose a metric to inspect its daily trend. Individually collected reports appear in Uploads with their own coverage.</p><div id="shorts-trend">${analyticsTrend(report.daily, report.dateRange, 'Shorts', 'shorts', shortsLimit, true)}</div></article>`;
 }
 function episodeAnalyticsRows() {
   const query = $('#analytics-search').value.trim().toLocaleLowerCase();
@@ -214,11 +246,20 @@ function initializeAnalytics() {
   $('#analytics-video').addEventListener('change', renderEpisodeAnalyticsDetail);
   $('#analytics').addEventListener('change', event => {
     if (event.target.id === 'channel-breakdown') { renderChannelBreakdown(); return; }
+    if (event.target.dataset.trendMetric === 'shorts') {
+      shortsMetric = shortsFields.some(([field]) => field === event.target.value) ? event.target.value : 'views';
+      $('#shorts-trend').innerHTML = analyticsTrend(data.shortsAnalytics.daily, data.shortsAnalytics.dateRange, 'Shorts', 'shorts', shortsLimit, true);
+      document.querySelector('[data-trend-metric="shorts"]')?.focus();
+      return;
+    }
     const key = event.target.dataset.trendRange;
     if (!key) return;
     const limit = event.target.value === 'all' ? null : Number(event.target.value);
     if (key === 'channel') $('#channel-trend').innerHTML = analyticsTrend(data.channelAnalytics.daily, data.channelAnalytics.dateRange, 'Channel', key, limit);
-    if (key === 'shorts') $('#shorts-trend').innerHTML = analyticsTrend(data.shortsAnalytics.daily, data.shortsAnalytics.dateRange, 'Shorts', key, limit, true);
+    if (key === 'shorts') {
+      shortsLimit = limit;
+      $('#shorts-trend').innerHTML = analyticsTrend(data.shortsAnalytics.daily, data.shortsAnalytics.dateRange, 'Shorts', key, limit, true);
+    }
     if (key === 'episode') {
       const video = videoFor($('#analytics-video').value);
       $('#episode-trend').innerHTML = analyticsTrend(video.daily, episodeRange(video), video.name, key, limit);
@@ -328,7 +369,7 @@ function pairCard(variant, group) {
   const title = variant.title || 'Title pairing not recovered';
   const caveats = variant.caveats || [];
   const sources = variant.sources || [];
-  return `<article class="pair-card">${imageHTML(variant.webThumbnail || variant.webEvidence, title, !variant.webThumbnail && !!variant.webEvidence)}<span class="record-status">${escapeHTML(variant.status === 'current' ? 'LATEST SAVED OBSERVATION' : variant.testId ? 'RECOVERED TEST PAIR' : 'HISTORICAL CAPTURE')}</span><h4>${escapeHTML(title)}</h4>${group ? `<div class="share ${highest ? 'highest' : ''}">${hasShare ? percent(share) : '—'}<small>${hasShare ? 'test watch-time share' : 'share not collected'}</small></div>${highest ? '<p>Highest recorded share in this group · not proof of a winner</p>' : ''}` : ''}<p>Observed: ${escapeHTML(variant.observedAt ? date(variant.observedAt) : 'Date not recorded')}</p>${variant.thumbnailDescription ? `<p>${escapeHTML(variant.thumbnailDescription)}</p>` : ''}<details><summary>Capture details &amp; evidence</summary><p>Record: ${escapeHTML(variant.variantId)}<br>Original capture date: ${escapeHTML(variant.observedAt || 'Not recorded')}</p>${variant.window ? `<p>${escapeHTML(variant.window)}</p>` : ''}${asset(variant.webEvidence) ? `<p><a href="${escapeHTML(asset(variant.webEvidence))}" target="_blank" rel="noopener noreferrer">Open saved screenshot ↗</a></p>` : ''}${caveats.length ? `<ul>${caveats.map(note => `<li>${escapeHTML(note)}</li>`).join('')}</ul>` : ''}${sources.length ? `<p>Original source references</p><ul>${sources.map(source => `<li>${escapeHTML(source)}</li>`).join('')}</ul>` : ''}</details></article>`;
+  return `<article class="pair-card">${imageHTML(variant.webThumbnail || variant.webEvidence, title, !variant.webThumbnail && !!variant.webEvidence)}<span class="record-status">${escapeHTML(variant.status === 'current' ? 'LATEST SAVED OBSERVATION' : variant.testId ? (group?.type === 'title-only' ? 'RECOVERED TITLE VARIANT' : 'RECOVERED TEST PAIR') : 'HISTORICAL CAPTURE')}</span><h4>${escapeHTML(title)}</h4>${group ? `<div class="share ${highest ? 'highest' : ''}">${hasShare ? percent(share) : '—'}<small>${hasShare ? 'test watch-time share' : 'share not collected'}</small></div>${highest ? '<p>Highest recorded share in this group · not proof of a winner</p>' : ''}` : ''}<p>Observed: ${escapeHTML(variant.observedAt ? date(variant.observedAt) : 'Date not recorded')}</p>${variant.thumbnailDescription ? `<p>${escapeHTML(variant.thumbnailDescription)}</p>` : ''}<details><summary>Capture details &amp; evidence</summary><p>Record: ${escapeHTML(variant.variantId)}<br>Original capture date: ${escapeHTML(variant.observedAt || 'Not recorded')}</p>${variant.window ? `<p>${escapeHTML(variant.window)}</p>` : ''}${asset(variant.webEvidence) ? `<p><a href="${escapeHTML(asset(variant.webEvidence))}" target="_blank" rel="noopener noreferrer">Open saved screenshot ↗</a></p>` : ''}${caveats.length ? `<ul>${caveats.map(note => `<li>${escapeHTML(note)}</li>`).join('')}</ul>` : ''}${sources.length ? `<p>Original source references</p><ul>${sources.map(source => `<li>${escapeHTML(source)}</li>`).join('')}</ul>` : ''}</details></article>`;
 }
 
 function renderPackaging() {
@@ -353,7 +394,7 @@ function renderPackaging() {
   }
   visible = visible.filter(group => !query || group.variants.some(matchesTitle));
   $('#packaging-count').textContent = `${visible.length} test groups shown. A matching title keeps its whole comparison group visible. ${scope === 'latest' ? 'Choose every saved test round for earlier and revised captures.' : 'Groups retain their original IDs; related captures may describe the same underlying test.'}`;
-  $('#packaging-results').innerHTML = visible.length ? visible.map(group => `<article class="test-round"><div class="round-header"><div><span class="eyebrow">${escapeHTML(group.episode)} / ${escapeHTML(group.testId)}</span><h3>${escapeHTML(group.result || (group.status?.includes('without a clear winner') ? 'No clear winner' : 'Saved test evidence'))}</h3><p>${escapeHTML(group.status || 'Final status not recorded')}<br>${escapeHTML(group.window || 'Exact run dates not recorded')}<br>Captured ${escapeHTML(date(group.observedAt))}</p></div><span class="pill">PAIRING RESULTS ONLY</span></div><div class="pair-grid">${group.variants.map(variant => pairCard(variant, group)).join('')}</div><div class="round-footer"><button class="text-button" type="button" data-draft-test="${escapeHTML(group.testId)}">Use this evidence in a draft ↗</button></div></article>`).join('') : '<p class="empty">No recovered native test matches these filters. Current API metadata is not a native test result. Choose capture history to inspect any saved evidence for this upload.</p>';
+  $('#packaging-results').innerHTML = visible.length ? visible.map(group => `<article class="test-round"><div class="round-header"><div><span class="eyebrow">${escapeHTML(group.episode)} / ${escapeHTML(group.testId)}</span><h3>${escapeHTML(group.result || (group.status?.includes('without a clear winner') ? 'No clear winner' : 'Saved test evidence'))}</h3><p>${escapeHTML(group.status || 'Final status not recorded')}<br>${escapeHTML(group.window || 'Exact run dates not recorded')}<br>Captured ${escapeHTML(date(group.observedAt))}</p></div><span class="pill">${group.type === 'title-only' ? 'TITLE-ONLY TEST' : group.type === 'thumbnail-only' ? 'THUMBNAIL-ONLY TEST' : 'PAIRING RESULTS ONLY'}</span></div><div class="pair-grid">${group.variants.map(variant => pairCard(variant, group)).join('')}</div><div class="round-footer"><button class="text-button" type="button" data-draft-test="${escapeHTML(group.testId)}">Use this evidence in a draft ↗</button></div></article>`).join('') : '<p class="empty">No recovered native test matches these filters. Current API metadata is not a native test result. Choose capture history to inspect any saved evidence for this upload.</p>';
 }
 
 function renderMetadata() {
@@ -573,7 +614,7 @@ async function importEntries(imported) {
   if (saved) setNotebookStatus(`Imported ${imported.length} experiments into the team notebook. ${merged.conflicts ? `${merged.conflicts} differing versions preserved as separate drafts.` : 'Identical existing drafts kept once.'}`);
 }
 
-const studioSections = new Set(['analytics', 'compare', 'packaging', 'metadata', 'notebook']);
+const studioSections = new Set(['analytics', 'uploads', 'compare', 'packaging', 'metadata', 'notebook']);
 function selectStudioSection(requested, updateUrl = true) {
   const selected = studioSections.has(requested) && (requested !== 'notebook' || teamAccess) ? requested : 'analytics';
   document.querySelectorAll('[data-studio-panel]').forEach(panel => { panel.hidden = panel.id !== selected; });
@@ -593,6 +634,50 @@ function initializeStudioNavigation() {
   window.addEventListener('hashchange', () => selectStudioSection(location.hash.slice(1), false));
 }
 
+function reportingStamp() {
+  $('#source-stamp').textContent = `Through ${date(data.apiThrough)} · Updated ${date(data.capturedAt)}`;
+  $('#method-dates').textContent = `Saved reporting evidence · API through ${date(data.apiThrough)} · collected ${date(data.capturedAt)} · historical Studio cards ${date(data.studioCapturedAt)}`;
+}
+function renderUploadAnalytics() {
+  mountUploadAnalytics($('#upload-analytics'), { uploadAnalytics: data.uploadAnalytics, channelBreakdowns: data.channelBreakdowns });
+}
+async function reloadStudioReporting() {
+  const response = await fetch('/api/workshop-data', { credentials: 'same-origin', cache: 'no-store' });
+  if (!response.ok) throw Error('Studio reporting unavailable');
+  const updated = await response.json();
+  if (!Array.isArray(updated.videos) || !updated.videos.length) throw Error('No included episodes returned');
+  data = updated;
+  if (!studioReady) { initialize(); return; }
+  tests = groupTests(data.history);
+  const options = data.videos.map(video => `<option value="${escapeHTML(video.id)}">${escapeHTML(video.name)}</option>`).join('');
+  for (const selector of ['#video-a', '#video-b', '#analytics-video', '#packaging-video']) {
+    const select = $(selector), value = select.value;
+    select.innerHTML = (selector === '#packaging-video' ? '<option value="all">All episodes</option>' : '') + options;
+    if ([...select.options].some(option => option.value === value)) select.value = value;
+  }
+  // Add newly discovered uploads without rewriting an unsaved notebook form.
+  for (const video of data.videos) {
+    if (![...$('#experiment-video').options].some(option => option.value === video.id)) {
+      $('#experiment-video').add(new Option(video.name, video.id));
+    }
+  }
+  const breakdown = $('#channel-breakdown')?.value;
+  renderChannelAnalytics();
+  if ([...$('#channel-breakdown').options].some(option => option.value === breakdown)) $('#channel-breakdown').value = breakdown;
+  renderChannelBreakdown();
+  renderShortsAnalytics();
+  renderEpisodeAnalytics();
+  renderEpisodeAnalyticsDetail();
+  renderSummary();
+  renderComparison();
+  renderHeadToHead();
+  renderPackaging();
+  renderMetadata();
+  renderUploadAnalytics();
+  reportingStamp();
+  window.SPSelect?.refresh();
+}
+
 function initialize() {
   tests = groupTests(data.history);
   const options = data.videos.map(video => `<option value="${escapeHTML(video.id)}">${escapeHTML(video.name)}</option>`).join('');
@@ -600,10 +685,9 @@ function initialize() {
   $('#packaging-video').insertAdjacentHTML('beforeend', options);
   $('#video-b').value = data.videos[Math.min(2, data.videos.length - 1)].id;
   window.SPSelect?.refresh();
-  const sourceText = `Saved reporting evidence · API through ${date(data.apiThrough)} · collected ${date(data.capturedAt)} · historical Studio cards ${date(data.studioCapturedAt)}`;
-  $('#source-stamp').textContent = `Through ${date(data.apiThrough)} · Updated ${date(data.capturedAt)}`;
-  $('#method-dates').textContent = sourceText;
+  reportingStamp();
   initializeAnalytics();
+  renderUploadAnalytics();
   renderSummary();
   renderComparison();
   renderHeadToHead();
@@ -636,10 +720,10 @@ function initialize() {
       const group = tests.find(item => item.testId === draft.dataset.draftTest);
       if (!group) return;
       newExperiment(group.videoId);
-      $('#experiment-change').value = 'Title + thumbnail pairing';
+      $('#experiment-change').value = group.type === 'title-only' ? 'Title only' : group.type === 'thumbnail-only' ? 'Thumbnail only' : 'Title + thumbnail pairing';
       window.SPSelect?.refresh($('#experiment-change'));
       $('#experiment-control').value = `${group.episode} / ${group.testId}\n${group.window || 'Exact run dates not recorded'}\nCaptured ${group.observedAt || 'date not recorded'}\n${group.status || group.result || 'No result recorded'}\n${group.variants.map(variant => `${variant.title || 'Title unknown'}: ${percent(variant.metrics?.watchTimeSharePct)} watch-time share`).join('\n')}`;
-      $('#experiment-metric').value = 'Native test watch-time share for the whole title/image pairing. Keep the full test dates and final status. Do not infer variant CTR or attribute the result to one element.';
+      $('#experiment-metric').value = group.type === 'title-only' ? 'Native title-only test with its shared thumbnail held fixed. Keep the full test dates and final status; unavailable shares remain unavailable. Do not infer variant CTR or a winner from the visible default.' : 'Native test watch-time share for the whole title/image pairing. Keep the full test dates and final status. Do not infer variant CTR or attribute the result to one element.';
       selectStudioSection('notebook');
       $('#notebook').scrollIntoView({ behavior: 'smooth' });
       $('#experiment-hypothesis').focus({ preventScroll: true });
@@ -652,6 +736,7 @@ function initialize() {
   updateTeamControls();
   $('#load-state').hidden = true;
   $('#workshop-content').hidden = false;
+  reportRefresh.mount($('[data-report-refresh]'));
 }
 
 async function load() {
@@ -666,6 +751,7 @@ async function load() {
     $('#load-state').setAttribute('role', 'alert');
     $('#load-state').innerHTML = `<strong>Studio could not load the saved report.</strong><br>${escapeHTML(error.message)}<p>Please try again when the reporting service is available.</p><button type="button" class="button" id="retry-load">Try again</button>`;
     $('#retry-load').addEventListener('click', load);
+    reportRefresh.mount($('[data-report-refresh]'));
   }
 }
 checkTeamAccess();

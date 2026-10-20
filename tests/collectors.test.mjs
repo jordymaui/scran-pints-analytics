@@ -46,9 +46,13 @@ test('YouTube parses column names, selects exact Shorts, and preserves lag/missi
   assert.equal(result.metrics.engagedViews, 20);
   assert.equal(result.metrics.watchHours, 0.2);
   assert.equal(result.metrics.subscribersNet, -2);
+  assert.equal(result.metrics.subscribersGained, 2);
+  assert.equal(result.metrics.subscribersLost, 4);
   assert.equal(result.metrics.followers, null);
   assert.equal(result.dateRange.end, '2026-10-17');
   assert.deepEqual(result.daily.map(row => row.day), ['2026-10-01', '2026-10-03']);
+  assert.deepEqual(result.daily[0], { day: '2026-10-01', views: 20, engagedViews: 10, watchHours: 0.1,
+    likes: 2, comments: 1, shares: 1, subscribersGained: 1, subscribersLost: 2, subscribersNet: -1 });
   assert.match(result.scope, /requested through 2026-10-19/);
   assert.equal(result.content.length, 0);
 });
@@ -67,6 +71,44 @@ test('YouTube paginates a full first page without dropping or double-counting ro
   assert.deepEqual(starts, [1, 201]);
   assert.equal(result.daily.length, 201);
   assert.equal(result.metrics.views, 4020);
+  assert.equal(result.daily[200].watchHours, 0.1);
+  assert.equal(result.daily[200].subscribersLost, 2);
+});
+
+test('YouTube full-history refresh preserves all daily metrics and refuses loss of saved history', async () => {
+  const base = { env: { YOUTUBE_ACCESS_TOKEN: 'test-access' }, capturedAt: CAPTURED,
+    start: '2026-08-28', end: '2026-10-20' };
+  const oldRows = [youtubeRow('2026-09-01'), youtubeRow('2026-10-18')];
+  const previous = await collectYouTubeShorts({ ...base, fetchImpl: async () => json(youtubeReport(oldRows)) });
+  const fullRows = [youtubeRow('2026-08-29', 'shorts', { views: 0, engagedViews: 0, likes: -1,
+    estimatedMinutesWatched: 0, subscribersGained: 0, subscribersLost: 0 }),
+    ...oldRows, youtubeRow('2026-10-19')];
+  const result = await collectYouTubeShorts({ ...base, previous, fetchImpl: async endpoint => {
+    const url = new URL(endpoint);
+    assert.equal(url.searchParams.get('startDate'), '2026-08-28');
+    assert.equal(url.searchParams.get('endDate'), '2026-10-20');
+    return json(youtubeReport(fullRows));
+  } });
+  assert.equal(result.dateRange.start, '2026-08-28');
+  assert.equal(result.dateRange.end, '2026-10-19');
+  assert.deepEqual(result.daily[0], { day: '2026-08-29', views: 0, engagedViews: 0, watchHours: 0,
+    likes: -1, comments: 1, shares: 1, subscribersGained: 0, subscribersLost: 0, subscribersNet: 0 });
+  assert.equal(result.metrics.likes, 5);
+  for (const returned of [
+    fullRows.filter(row => row.day !== '2026-09-01'),
+    [youtubeRow('2026-09-01'), youtubeRow('2026-10-17')],
+  ]) await assert.rejects(collectYouTubeShorts({ ...base, previous,
+    fetchImpl: async () => json(youtubeReport(returned)) }), error => error.code === 'coverage-loss');
+  let requests = 0;
+  await assert.rejects(collectYouTubeShorts({ ...base, start: '2026-09-01', previous,
+    fetchImpl: async () => { requests++; return json({}); } }), error => error.code === 'coverage-loss');
+  assert.equal(requests, 0);
+  // Earlier snapshots containing views alone can be upgraded without inventing old metrics.
+  const legacy = structuredClone(previous);
+  delete legacy.metrics.subscribersGained; delete legacy.metrics.subscribersLost;
+  legacy.daily = legacy.daily.map(({ day, views }) => ({ day, views }));
+  assert.equal((await collectYouTubeShorts({ ...base, previous: legacy,
+    fetchImpl: async () => json(youtubeReport(fullRows)) })).daily[1].watchHours, 0.1);
 });
 
 test('YouTube selects observed camelCase content types alongside documented aliases without guessing unknowns', async () => {

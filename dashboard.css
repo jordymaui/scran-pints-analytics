@@ -1,4 +1,5 @@
 @import url('/brand-tokens.css');
+@import url('/refresh.css');
 @font-face{font-family:Bulluck;src:url('/fonts/bulluck-stone-latin.woff2') format('woff2');font-display:swap}
 :root{--paper:var(--brand-card);--cream:var(--brand-paper);--ink:var(--brand-ink);--muted:var(--brand-muted);--line:var(--brand-line);--red:var(--brand-red);--green:#26805b;--sidebar:216px}
 *{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:var(--type-body)/1.55 var(--brand-body)}button,input,select{font:inherit;color:inherit}button,a,input,select{touch-action:manipulation}button{cursor:pointer;background:none}button:disabled{cursor:default;opacity:.45}a{color:inherit;text-decoration:none}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #db0b1980;outline-offset:3px}h1,h2,h3,p{margin:0}h1{font:400 38px/1.1 var(--brand-display);letter-spacing:-.3px}h2{font:400 27px/1.15 var(--brand-display);letter-spacing:0}h3{font:700 18px/1.4 var(--brand-body)}svg{display:block}.skip{position:fixed;z-index:100;top:-100px;padding:12px;background:var(--ink);color:white}.skip:focus{top:12px;left:12px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
@@ -14,3 +15,4 @@
 @media print{.sidebar,.toolbar,.top-actions,.page-footer,.coverage-details,.chart-controls,.text-button{display:none}.app{margin:0}.topbar{border:0}main{padding:0}.metric-grid{grid-template-columns:repeat(7,1fr)}.metric{padding:8px}.metric-value{font-size:28px}.chart-panel{break-inside:avoid}.lower-grid{grid-template-columns:1.5fr 1fr}.panel{break-inside:avoid}.chart-tooltip{display:none}}
 @media(max-width:540px){#export-report{font-size:0;gap:0;min-width:38px;justify-content:center}#export-report svg{width:16px;height:16px}.toolbar-group:last-child{flex-wrap:nowrap}}
 @media(max-width:380px){.sidebar .nav-item svg{display:none}.sidebar .nav-item{font-size:14px;padding:10px 8px}.sidebar nav{gap:2px}.engagement-chart{gap:20px;padding:16px}.legend-list{min-width:85px}}
+@media(max-width:540px){.top-actions .studio-shortcut{display:none}.top-actions{gap:8px}}

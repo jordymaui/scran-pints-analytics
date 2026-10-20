@@ -13,6 +13,18 @@ const fixtureRows = {
   subscribed: [{ subscribedStatus: 'UNSUBSCRIBED', views: 10, estimatedMinutesWatched: 60 }],
   format: [{ creatorContentType: 'SHORTS', views: 10, estimatedMinutesWatched: 60 }],
   demographics: [{ ageGroup: '18-24', gender: 'female', viewerPercentage: 22.4 }],
+  operatingSystem: [{ operatingSystem: 'ANDROID', views: 10, estimatedMinutesWatched: 60 }],
+  playbackLocation: [{ insightPlaybackLocationType: 'WATCH', views: 10, estimatedMinutesWatched: 60 }],
+  youtubeProduct: [{ youtubeProduct: 'CORE', views: 10, estimatedMinutesWatched: 60 }],
+  liveOrOnDemand: [{ liveOrOnDemand: 'ON_DEMAND', views: 10, estimatedMinutesWatched: 60 }],
+  sharing: [{ sharingService: 'WHATS_APP', shares: 3 }],
+  searchTerms: [{ insightTrafficSourceDetail: 'football food', views: 10, estimatedMinutesWatched: 60 }],
+  externalSources: [{ insightTrafficSourceDetail: 'example.com', views: 10, estimatedMinutesWatched: 60 }],
+  suggestedVideos: [{ insightTrafficSourceDetail: 'abcdefghijk', views: 10, estimatedMinutesWatched: 60 }],
+  engagement: [{ day: '2026-10-15', engagedViews: 7, dislikes: 0, videosAddedToPlaylists: 2,
+    videosRemovedFromPlaylists: 1, redViews: 1, estimatedRedMinutesWatched: 2.5 }],
+  cards: [{ day: '2026-10-15', cardImpressions: 10, cardClicks: 1, cardClickRate: .1,
+    cardTeaserImpressions: 20, cardTeaserClicks: 2, cardTeaserClickRate: .1 }],
 };
 const options = {
   capturedAt: '2026-10-20T12:00:00Z', start: '2025-01-01', end: '2026-10-17',
@@ -29,7 +41,7 @@ test('optional channel reports use only supported native metric/dimension combin
     calls.push(request);
     return structuredClone(fixtureRows[request.id]);
   } });
-  assert.equal(calls.length, 6);
+  assert.equal(calls.length, 16);
   assert.deepEqual(calls.find(call => call.id === 'traffic').report, {
     dimensions: 'insightTrafficSourceType', metrics: 'views,estimatedMinutesWatched', sort: 'insightTrafficSourceType',
   });
@@ -37,7 +49,13 @@ test('optional channel reports use only supported native metric/dimension combin
     dimensions: 'ageGroup,gender', metrics: 'viewerPercentage', sort: 'ageGroup,gender',
   });
   assert.ok(calls.every(call => call.startDate === options.start && call.endDate === options.end &&
-    !('filters' in call.report) && !('accessToken' in call)));
+    !('accessToken' in call)));
+  for (const id of ['searchTerms', 'externalSources', 'suggestedVideos']) {
+    const request = calls.find(call => call.id === id);
+    assert.equal(request.report.maxResults, 25);
+    assert.equal(request.report.sort, '-views');
+    assert.match(request.report.filters, /^insightTrafficSourceType==(?:YT_SEARCH|EXT_URL|RELATED_VIDEO)$/);
+  }
   assert.deepEqual(Object.keys(result).sort(), Object.keys(CHANNEL_BREAKDOWN_REPORTS).sort());
   assert.equal(result.device.report.rows[0].views, 0);
   assert.equal(result.demographics.report.rows[0].viewerPercentage, 22.4);
@@ -100,12 +118,31 @@ test('strict optional schema rejects duplicates, extra secrets, forged status an
     value => { value.traffic.status = 'no-rows'; },
     value => { value.demographics.report.rows[0].viewerPercentage = 100.1; },
     value => { value.demographics.report.rows[0].gender = '\u0000'; },
+    value => { value.cards.report.rows[0].cardClickRate = 1.1; },
+    value => { value.sharing.report.rows[0].shares = .5; },
+    value => { value.engagement.report.rows[0].day = '2024-12-31'; },
   ]) {
     const modified = structuredClone(valid); alter(modified);
     assert.throws(() => validateChannelBreakdowns(modified), /Invalid saved channel breakdown/);
   }
   const duplicate = await collectChannelBreakdowns({ ...options, query: async ({ id }) => [...fixtureRows[id], ...fixtureRows[id]] });
   assert.ok(Object.values(duplicate).every(entry => entry.status === 'failed' && entry.errorCode === 'invalid-response'));
+});
+
+test('optional daily reports preserve missing historical dates and bound concurrency', async () => {
+  const previous = await collectChannelBreakdowns(options);
+  const seen = { active: 0, maximum: 0 };
+  const result = await collectChannelBreakdowns({ ...options, previous, query: async ({ id }) => {
+    seen.active++;
+    seen.maximum = Math.max(seen.maximum, seen.active);
+    await new Promise(resolve => setImmediate(resolve));
+    seen.active--;
+    return id === 'engagement' ? [{ ...fixtureRows.engagement[0], day: '2026-10-16' }] : structuredClone(fixtureRows[id]);
+  } });
+  assert.ok(seen.maximum <= 6);
+  assert.equal(result.engagement.status, 'failed-retained');
+  assert.equal(result.engagement.errorCode, 'coverage-loss');
+  assert.deepEqual(result.engagement.report, previous.engagement.report);
 });
 
 test('private endpoint isolates malformed optional breakdowns and public report excludes native rows', async () => {
@@ -133,7 +170,8 @@ test('channel selector renders native demographics, retained dates, empty status
     if (!elements.has(selector)) elements.set(selector, { innerHTML: '', value: '', addEventListener() {} });
     return elements.get(selector);
   };
-  const context = vm.createContext({ document: { querySelector: element }, Intl, Date, Number, String, Map, Set });
+  const context = vm.createContext({ document: { querySelector: element }, Intl, Date, Number, String, Map, Set,
+    createReportRefresh: () => ({ mount() {} }) });
   const source = (await readFile(new URL('../workshop.js', import.meta.url), 'utf8'))
     .replace(/^import .*;\r?\n/gm, '').replace(/\r?\ncheckTeamAccess\(\);\r?\nload\(\);\s*$/, '');
   vm.runInContext(source, context);

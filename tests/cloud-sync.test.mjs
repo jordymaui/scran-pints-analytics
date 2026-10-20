@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { syncCloudSource, scheduledWindow } from '../lib/cloud-sync.mjs';
+import { syncCloudSource, scheduledWindow, shortsHistoryStart } from '../lib/cloud-sync.mjs';
 import { CollectionError } from '../lib/collectors.mjs';
 import { createSyncHandler, validCronAuthorization, requestedSource } from '../api/sync.mjs';
 
@@ -30,9 +30,20 @@ function fakeStore({ connection = null, snapshot = null, busy = false, rejectOld
   return store;
 }
 
-test('scheduled YouTube window follows Pacific dates and leaves processing time', () => {
-  assert.deepEqual(scheduledWindow(NOW), { start: '2026-09-20', end: '2026-10-17' });
-  assert.deepEqual(scheduledWindow('2026-10-20T01:00:00.000Z'), { start: '2026-09-19', end: '2026-10-16' });
+test('scheduled YouTube requests reach today in Pacific time without an artificial lag', () => {
+  assert.deepEqual(scheduledWindow(NOW), { start: '2026-09-23', end: '2026-10-20' });
+  assert.deepEqual(scheduledWindow('2026-10-20T01:00:00.000Z'), { start: '2026-09-22', end: '2026-10-19' });
+});
+
+test('Shorts backfill starts at the earliest channel or retained reporting evidence', () => {
+  assert.equal(shortsHistoryStart({
+    channelAnalytics: { dateRange: { start: '2026-08-28' } },
+    videos: [{ publishedAt: '2026-09-01T01:00:00Z' }],
+  }, sourceSnapshot()), '2026-08-28');
+  assert.equal(shortsHistoryStart({
+    publicReport: { content: [{ publishedAt: '2026-08-01T01:00:00Z' }] },
+  }, sourceSnapshot()), '2026-07-31');
+  assert.throws(() => shortsHistoryStart({}, null), /channel inventory/);
 });
 
 test('missing connection records a safe not-connected run without replacing data', async () => {
@@ -52,13 +63,14 @@ test('Shorts maps saved credentials without mutating process state and shares th
   let received;
   const result = await syncCloudSource({
     source: 'youtube-shorts', store, now, env, trigger: 'cron',
+    seedLoader: async () => ({ channelAnalytics: { dateRange: { start: '2026-08-28' } } }),
     collectors: { 'youtube-shorts': async options => { received = options; return sourceSnapshot(); } },
   });
   assert.equal(result.status, 'ready');
   assert.equal(received.env.YOUTUBE_REFRESH_TOKEN, 'private-refresh');
   assert.equal(received.env.YOUTUBE_CHANNEL_ID, 'UCabcdefghijklmnopqrstuv');
-  assert.equal(received.start, '2026-09-20');
-  assert.equal(received.end, '2026-10-17');
+  assert.equal(received.start, '2026-08-28');
+  assert.equal(received.end, '2026-10-20');
   assert.equal(store.calls[0][1], 'youtube');
   assert.equal(store.calls.find(call => call[0] === 'connection')[1], 'youtube');
   assert.equal(store.calls.find(call => call[0] === 'save')[1], 'youtube-shorts');

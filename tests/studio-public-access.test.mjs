@@ -93,6 +93,7 @@ test('Studio projection preserves renderer contracts, dates, metadata distinctio
   element('#packaging-video').value = 'all';
   element('#packaging-scope').value = 'latest';
   const context = vm.createContext({ ...workshopModel, fixture: projected,
+    createReportRefresh: () => ({ mount() {} }),
     document: { querySelector: element, querySelectorAll: () => [] }, window: {},
     Intl, Date, Number, String, Map, Set });
   const source = (await readFile(new URL('../workshop.js', import.meta.url), 'utf8'))

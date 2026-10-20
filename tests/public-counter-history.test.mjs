@@ -33,7 +33,7 @@ const point = report => ({
   subscribers: report.channel.subscribers, videoCount: report.channel.videoCount,
 });
 
-test('history storage query bounds rows and selects only the public report JSON field', async () => {
+test('history storage query pages rows and selects only the public report JSON field', async () => {
   let request;
   const store = createCloudStore({
     env: { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SECRET_KEY: 'sb_secret_TEST_ONLY' },
@@ -49,10 +49,10 @@ test('history storage query bounds rows and selects only the public report JSON 
   assert.equal(request.url.searchParams.get('source'), 'eq.youtube');
   assert.equal(request.url.searchParams.get('select'), 'publicReport:payload->publicReport');
   assert.equal(request.url.searchParams.get('payload->publicReport'), 'not.is.null');
-  assert.equal(request.url.searchParams.get('limit'), '90');
+  assert.equal(request.url.searchParams.get('limit'), '100');
   assert.equal(request.url.searchParams.get('order'), 'captured_at.desc,archived_at.desc,id.desc');
   assert.equal(request.init.method, 'GET');
-  assert.equal(history.length, 90);
+  assert.equal(history.length, 95);
   assert.doesNotMatch(JSON.stringify(history), /PRIVATE_ARCHIVE|refreshToken/);
 });
 
@@ -90,14 +90,29 @@ test('history sorts actual public capture times, deduplicates exact captures, an
   assert.equal(source.counterHistory[1].views, 98, 'Native counters may decrease; do not manufacture growth');
 });
 
-test('history is capped at the latest 90 observations including current and ignores observations newer than current', async () => {
-  const history = Array.from({ length: 90 }, (_, index) =>
+test('history retains every archived observation and ignores observations newer than current', async () => {
+  const history = Array.from({ length: 120 }, (_, index) =>
     observation(new Date(Date.parse(current.capturedAt) - (index + 1) * 86_400_000).toISOString(), index));
   const source = await youtube(history);
-  assert.equal(source.counterHistory.length, 90);
+  assert.equal(source.counterHistory.length, 121);
   assert.deepEqual(source.counterHistory.at(-1), point(current));
-  assert.equal(source.counterHistory[0].capturedAt, history[88].capturedAt);
+  assert.equal(source.counterHistory[0].capturedAt, history[119].capturedAt);
   assert.deepEqual((await youtube([observation('2026-10-21T12:00:00.000Z')])).counterHistory, [point(current)]);
+});
+
+test('history storage reads every page rather than the first page only', async () => {
+  const offsets = [];
+  const store = createCloudStore({
+    env: { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SECRET_KEY: 'sb_secret_TEST_ONLY' },
+    fetcher: async url => {
+      const offset = Number(new URL(url).searchParams.get('offset'));
+      offsets.push(offset);
+      return new Response(JSON.stringify(Array.from({ length: offset === 0 ? 100 : 3 },
+        () => ({ publicReport: current }))));
+    },
+  });
+  assert.equal((await store.loadPublicYouTubeHistory()).length, 103);
+  assert.deepEqual(offsets, [0, 100]);
 });
 
 test('failed or malformed history reads retain the current public report without disclosing errors', async () => {
