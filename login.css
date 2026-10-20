@@ -1,23 +1,25 @@
+@import url('/brand-tokens.css');
+
 @font-face{font-family:Bulluck;src:url('/fonts/bulluck-stone-latin.woff2') format('woff2');font-display:swap}
-:root{color-scheme:light;--paper:#f7f1e5;--ink:#20201d;--red:#db0b19}
+:root{color-scheme:light}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 Arial,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+body{margin:0;background:var(--brand-paper);color:var(--brand-ink);font:16px/1.55 var(--brand-body);min-height:100vh;display:flex;flex-direction:column}
 a{color:inherit;text-underline-offset:4px}
-.back{align-self:flex-start;margin:28px 5vw;font-weight:700;text-decoration:none}
+.back{align-self:flex-start;margin:28px 5vw;font:700 14px/1.55 var(--brand-body);text-decoration:none}
 main{width:min(94%,660px);margin:20px auto 65px;text-align:center}
 .logo{width:200px;height:auto}
-.eyebrow{font-size:12px;font-weight:900;letter-spacing:.16em;margin:32px 0 12px}
-h1{font-family:Bulluck,Impact,sans-serif;font-size:clamp(44px,8vw,70px);line-height:.98;font-weight:400;letter-spacing:-.02em;margin:0 0 24px}
-.intro{max-width:450px;margin:0 auto 30px;color:#534d45;font-size:18px}
+.eyebrow{font:700 13px/1.55 var(--brand-mono);letter-spacing:.08em;margin:32px 0 12px}
+h1{font-family:var(--brand-display);font-size:clamp(44px,8vw,70px);line-height:1.08;font-weight:400;letter-spacing:-.02em;margin:0 0 24px}
+.intro{max-width:450px;margin:0 auto 30px;color:var(--brand-muted);font-size:18px;line-height:1.55}
 form{max-width:370px;margin:auto}
-button{width:100%;min-height:56px;border:2px solid var(--ink);border-radius:6px;background:var(--red);color:white;font:700 16px Arial,sans-serif;padding:14px 20px;box-shadow:4px 4px 0 var(--ink);cursor:pointer}
-button span{display:inline-grid;place-items:center;background:white;color:var(--ink);width:24px;height:24px;border-radius:50%;margin-right:12px}
-button:hover:not(:disabled){background:#bd0713;transform:translateY(-1px)}
-button:disabled{cursor:wait;background:#82776c;box-shadow:2px 2px 0 var(--ink)}
-button:focus-visible,a:focus-visible{outline:3px solid #0b6b91;outline-offset:5px}
-.status{max-width:460px;margin:22px auto 10px;min-height:25px;font-size:14px}
-.access-note{font-size:13px;color:#655b50;margin:10px 0 32px}
-.sponsor-link{font-weight:700;font-size:14px}
-footer{margin-top:auto;border-top:1px solid #cfc1ad;padding:20px;text-align:center;font-size:12px;font-weight:700;letter-spacing:.06em}
+button{width:100%;min-height:56px;border:2px solid var(--brand-ink);border-radius:6px;background:var(--brand-red);color:white;font:700 16px/1.5 var(--brand-body);padding:14px 20px;box-shadow:4px 4px 0 var(--brand-ink);cursor:pointer}
+button span{display:inline-grid;place-items:center;background:var(--brand-card);color:var(--brand-ink);width:24px;height:24px;border-radius:50%;margin-right:12px}
+button:hover:not(:disabled){background:var(--brand-ink);transform:translateY(-1px)}
+button:disabled{cursor:wait;background:var(--brand-muted);box-shadow:2px 2px 0 var(--brand-ink)}
+button:focus-visible,a:focus-visible{outline:3px solid var(--brand-red);outline-offset:5px}
+.status{max-width:460px;margin:22px auto 10px;min-height:25px;font-size:16px}
+.access-note{font-size:16px;color:var(--brand-muted);margin:10px 0 32px}
+.sponsor-link{font:700 14px/1.55 var(--brand-body)}
+footer{margin-top:auto;border-top:1px solid var(--brand-line);padding:20px;text-align:center;font:700 13px/1.6 var(--brand-mono);letter-spacing:.06em}
 @media(max-width:480px){.back{margin:20px}main{margin-top:12px}.logo{width:170px}.intro{font-size:16px;max-width:310px}form{max-width:320px}.eyebrow{margin-top:24px}}
 @media(prefers-reduced-motion:reduce){button:hover:not(:disabled){transform:none}}

@@ -1,3 +1,4 @@
+@import url('/brand-tokens.css');
 @font-face{font-family:"DM Mono";font-style:normal;font-weight:400;font-display:swap;src:url("/fonts/38f8abefb8f8-latin.woff2") format("woff2")}
 @font-face{font-family:"Oswald";font-style:normal;font-weight:600;font-display:swap;src:url("/fonts/57baaaa1a342-latin.woff2") format("woff2")}
 @font-face{font-family:"Young Serif";font-style:normal;font-weight:400;font-display:swap;src:url("/fonts/ade2a8d72ee1-latin.woff2") format("woff2")}
@@ -22,164 +23,184 @@
 
 /* Studio shell is scoped: Connections also uses the base component styles. */
 body.studio {
-  --red:#c53529; --ink:#222522; --paper:#f5f3ed; --cream:#fffefa;
-  --muted:#73776d; --line:#e1e2d8;
-  --mono:Arial,Helvetica,sans-serif; --serif:Arial,Helvetica,sans-serif;
-  background:var(--paper); font-size:13px; line-height:1.5;
+  --red:var(--brand-red,#db0b19); --ink:var(--brand-ink,#151310);
+  --paper:var(--brand-paper,#fbf0df); --cream:var(--brand-card,#fffaef);
+  --muted:var(--brand-muted,#686158); --line:var(--brand-line,#d4c8b6);
+  --mono:var(--brand-mono,'Courier New',monospace);
+  --serif:var(--brand-body,Arial,Helvetica,sans-serif);
+  background:var(--paper); font-family:var(--brand-body,Arial,Helvetica,sans-serif); font-size:16px; line-height:1.55;
 }
 .studio-sidebar {
-  position:fixed; inset:0 auto 0 0; z-index:25; width:184px; padding:24px 13px 18px;
-  display:flex; flex-direction:column; background:#eeeee7; border-right:1px solid var(--line);
+  position:fixed; inset:0 auto 0 0; z-index:25; width:216px; padding:24px 17px 18px;
+  display:flex; flex-direction:column; background:var(--paper); border-right:1px solid var(--line);
 }
 .studio-brand {display:block;padding:0 6px 25px}
 .studio-brand img {display:block;width:146px;height:auto}
 .studio-sidebar nav {display:grid;gap:5px}
 .studio-sidebar nav a,.studio-sidebar-bottom>a {
   display:flex;align-items:center;gap:12px;padding:11px 13px;text-decoration:none;
-  border-radius:7px;font-size:13px;font-weight:500;line-height:20px;
+  border-radius:7px;font-size:15px;font-weight:500;line-height:24px;
 }
 .studio-sidebar svg {width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;flex-shrink:0}
-.studio-sidebar nav a:hover,.studio-sidebar-bottom>a:hover {background:#e6e7dd}
-.studio-sidebar nav a[aria-current] {background:#e7e8dd;font-weight:700}
+.studio-sidebar nav a:hover,.studio-sidebar-bottom>a:hover {background:var(--cream)}
+.studio-sidebar nav a[aria-current] {background:var(--cream);font-weight:700}
 .studio-sidebar nav a[aria-current] svg {color:var(--red)}
 .studio-sidebar-bottom {margin-top:auto;padding-top:25px}
-.studio-sidebar-bottom .studio-site-link {font-size:11px;font-weight:400;color:var(--muted)}
-.studio-app {margin-left:184px;min-width:0}
+.studio-sidebar-bottom .studio-site-link {font-size:13px;font-weight:400;color:var(--muted)}
+.studio-app {margin-left:216px;min-width:0}
 .studio-header {
-  height:64px;padding:0 28px;display:flex;align-items:center;justify-content:space-between;
+  min-height:78px;padding:10px 28px;display:flex;align-items:center;justify-content:space-between;gap:14px;
   border-bottom:1px solid var(--line);
 }
 .studio-header>div {display:flex;align-items:center;gap:16px}
-.studio .studio-header h1 {font:650 20px/1.2 Arial,Helvetica,sans-serif;letter-spacing:-.4px;margin:0}
-.studio-header span {font-size:11px;color:var(--muted)}
+.studio .studio-header h1 {font:400 38px/1.1 var(--brand-display,'Bulluck Stone',Impact,sans-serif);letter-spacing:0;margin:0}
+.studio-header span {font:13px/1.55 var(--mono);color:var(--muted)}
 .studio-header form {margin:0}
-.studio-header .text-button {font-size:12px;text-decoration:none;padding:8px 0 8px 14px}
+.studio-header .text-button {font-size:14px;text-decoration:none;padding:10px 0 10px 14px}
 .studio main {width:auto;max-width:1680px;margin:0 auto;padding:0 28px 20px}
 .studio .section-nav {
-  position:sticky;top:0;z-index:15;display:flex;gap:24px;min-height:51px;margin:0 0 20px;
+  position:sticky;top:0;z-index:15;display:flex;gap:26px;min-height:57px;margin:0 0 24px;
   padding:0;border:0;border-bottom:1px solid var(--line);background:var(--paper);
 }
 .studio .section-nav a:nth-child(n) {
   display:flex;align-items:center;border:0;border-bottom:2px solid transparent;border-radius:0;
-  background:none;padding:15px 0 12px;font:500 12px/1.5 Arial,Helvetica,sans-serif;
+  background:none;padding:17px 0 14px;font:500 15px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);
   color:var(--muted);text-decoration:none;white-space:nowrap;
 }
 .studio .section-nav a[aria-current] {color:var(--ink);border-bottom-color:var(--red);font-weight:700}
 .studio .section-nav a:hover {color:var(--red)}
 .studio .work-section {margin:0 0 26px;padding:0;border:0;scroll-margin-top:65px}
-.studio h2 {font:650 19px/1.35 Arial,Helvetica,sans-serif;letter-spacing:-.35px;margin:0}
-.studio h3 {font:650 15px/1.4 Arial,Helvetica,sans-serif;letter-spacing:-.15px;margin:0}
-.studio h4 {font:600 14px/1.4 Arial,Helvetica,sans-serif;margin:0}
-.studio .section-heading {gap:16px;margin:0 0 16px;align-items:center}
-.studio .section-heading h2 {font-size:19px}
+.studio h2 {font:400 36px/1.15 var(--brand-display,'Bulluck Stone',Impact,sans-serif);letter-spacing:0;margin:0}
+.studio h3 {font:650 20px/1.4 var(--brand-body,Arial,Helvetica,sans-serif);letter-spacing:0;margin:0}
+.studio h4 {font:600 18px/1.4 var(--brand-body,Arial,Helvetica,sans-serif);margin:0}
+.studio .section-heading {gap:18px;margin:0 0 20px;align-items:center;flex-wrap:wrap;min-width:0}
+.studio .section-heading h2 {font-size:36px}
 .studio .section-heading.compact {margin-bottom:10px}
-.studio .source-stamp {font:11px/1.6 Arial,Helvetica,sans-serif;color:var(--muted);margin:5px 0 0;max-width:none}
+.studio .source-stamp {font:13px/1.55 var(--mono);color:var(--muted);margin:8px 0 0;max-width:none;overflow-wrap:anywhere}
 .studio .source-stamp:before {display:none}
 .studio .button {
-  border:1px solid #d6d8cc;border-radius:6px;min-height:33px;padding:8px 12px;
-  background:var(--ink);color:var(--cream);font:500 11px/1.4 Arial,Helvetica,sans-serif;text-decoration:none;
+  border:1px solid var(--line);border-radius:6px;min-height:42px;padding:10px 15px;
+  background:var(--ink);color:var(--cream);font:600 14px/1.5 var(--brand-body,Arial,Helvetica,sans-serif);text-decoration:none;
 }
 .studio .button.secondary {background:var(--cream);color:var(--ink);border-color:var(--line)}
 .studio .button:hover {border-color:var(--red)}
 .studio input,.studio select,.studio textarea {
-  border:1px solid #d9dcd0;border-radius:6px;padding:8px 10px;background:var(--cream);font-size:12px;
+  border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--cream);font-size:16px;min-width:0;
 }
-.studio label {font:11px/1.4 Arial,Helvetica,sans-serif;gap:5px;color:#62675c}
-.studio .eyebrow {font:11px/1.5 Arial,Helvetica,sans-serif;letter-spacing:0;text-transform:none}
-.studio .note,.studio .section-intro {font:11px/1.65 Arial,Helvetica,sans-serif;color:var(--muted)}
-.studio .section-intro {margin:0 0 17px;max-width:1000px}
-.studio .pill {font:10px/1.4 Arial,Helvetica,sans-serif;padding:4px 7px;border:1px solid var(--line);border-radius:4px}
+.studio label {font:14px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);gap:6px;color:var(--muted)}
+.studio .eyebrow {font:13px/1.55 var(--mono);letter-spacing:0;text-transform:none}
+.studio .note,.studio .section-intro {font:13px/1.6 var(--brand-body,Arial,Helvetica,sans-serif);color:var(--muted)}
+.studio .section-intro {font-size:16px;margin:0 0 20px;max-width:1000px}
+.studio .pill {font:13px/1.4 var(--mono);padding:5px 8px;border:1px solid var(--line);border-radius:4px}
 .studio .analytics-report {padding:20px;margin:16px 0;border:1px solid var(--line);border-radius:9px;background:var(--cream)}
 .studio .channel-overview {margin-top:0;padding:18px 20px 12px}
 .studio .channel-overview>.section-heading {margin-bottom:3px}
-.studio .report-date {margin:0 0 16px}
+.studio .report-date {font-family:var(--mono);margin:0 0 20px}
 .studio .analytics-metrics {
   grid-template-columns:repeat(6,minmax(0,1fr));gap:0;margin:0 0 6px;border:0;
   border-bottom:1px solid var(--line);background:none;
 }
-.studio .analytics-metrics>div {padding:11px 14px 18px;background:none;border-right:1px solid var(--line)}
+.studio .analytics-metrics>div {padding:14px 14px 20px;background:none;border-right:1px solid var(--line)}
 .studio .analytics-metrics>div:first-child {padding-left:0}
 .studio .analytics-metrics>div:last-child {border-right:0}
-.studio .analytics-metrics dt {font:11px/1.6 Arial,Helvetica,sans-serif;color:#73776d}
-.studio .analytics-metrics dd {font:600 clamp(23px,2.4vw,34px)/1.25 Arial,Helvetica,sans-serif;letter-spacing:-1px;font-variant-numeric:tabular-nums;margin:9px 0 0}
+.studio .analytics-metrics dt {font:14px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);color:var(--muted)}
+.studio .analytics-metrics dd {font:600 clamp(32px,2.7vw,38px)/1.25 var(--brand-body,Arial,Helvetica,sans-serif);letter-spacing:-.7px;font-variant-numeric:tabular-nums;margin:10px 0 0}
 .studio .channel-overview>.analytics-metrics>div:first-child dd {color:var(--red)}
 .studio .report-details {border-top:1px solid var(--line);margin-top:10px;padding-top:9px}
-.studio .report-details summary,.studio .studio-coverage summary {font-size:11px;color:var(--muted);padding:3px 0}
+.studio .report-details summary,.studio .studio-coverage summary {font-size:14px;color:var(--muted);padding:7px 0}
 .studio .report-details .analytics-metrics {grid-template-columns:repeat(4,minmax(0,1fr));margin-top:15px}
-.studio .report-details dd {font-size:26px}
+.studio .report-details dd {font-size:32px}
 .studio .analytics-trend {padding:16px 0 0;margin:0;border:0;border-radius:0;background:none}
 .studio .analytics-trend .section-heading {margin-bottom:13px;min-height:30px}
 .studio .analytics-trend label {display:flex;align-items:center;gap:9px;min-width:0}
-.studio .analytics-trend select {width:160px;font-size:11px}
+.studio .analytics-trend select {width:215px;font-size:16px}
 .studio .analytics-trend svg {min-height:280px;max-height:390px;overflow:visible}
-.studio .analytics-trend text {fill:#8b8e83;font:10px Arial,Helvetica,sans-serif}
-.studio .chart-coverage {margin:5px 0;font-size:10px}
-.studio .analytics-daily summary {font:11px/1.6 Arial,Helvetica,sans-serif;padding:5px 0}
+.studio .analytics-trend text {fill:var(--muted);font:13px var(--brand-body,Arial,Helvetica,sans-serif)}
+.studio .analytics-trend line,.studio #retention-chart line {stroke:var(--line)}
+.studio .analytics-trend polyline,.studio #retention-chart polyline:first-of-type {stroke:var(--red)}
+.studio .analytics-trend polygon,.studio .analytics-trend circle {fill:var(--red)}
+.studio #retention-chart polyline:nth-of-type(2) {stroke:var(--ink)}
+.studio .chart-coverage {margin:8px 0;font:13px/1.55 var(--mono)}
+.studio .analytics-daily summary {font:14px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);padding:8px 0}
 .studio .analytics-heading {margin:26px 0 12px}
 .studio .channel-breakdowns .section-heading {margin-bottom:10px}
 .studio .channel-breakdowns label {display:flex;align-items:center;gap:10px;width:auto}
-.studio .channel-breakdowns select {width:190px}
+.studio .channel-breakdowns select {width:230px}
 .studio .table-scroll {border:1px solid var(--line);border-radius:7px;background:var(--cream)}
 .studio table {border-collapse:collapse;width:100%}
-.studio .table-scroll th,.studio .table-scroll td {padding:12px 13px;font-size:12px;border-color:var(--line)}
-.studio .table-scroll thead th {font:500 10px/1.5 Arial,Helvetica,sans-serif;letter-spacing:0;color:#7d8175;background:#f5f6ef;text-transform:none}
-.studio .table-scroll tbody th {font:500 12px/1.5 Arial,Helvetica,sans-serif}
-.studio .table-scroll td.metric {font:500 13px/1.5 Arial,Helvetica,sans-serif;font-variant-numeric:tabular-nums}
-.studio .table-scroll small {font:10px/1.6 Arial,Helvetica,sans-serif;color:var(--muted)}
+.studio .table-scroll th,.studio .table-scroll td {padding:14px 15px;font:15px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);border-color:var(--line)}
+.studio .table-scroll thead th {font:500 15px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);letter-spacing:0;color:var(--muted);background:var(--paper);text-transform:none}
+.studio .table-scroll tbody th {font:500 15px/1.55 var(--brand-body,Arial,Helvetica,sans-serif)}
+.studio .table-scroll td.metric {font:500 15px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);font-variant-numeric:tabular-nums}
+.studio .table-scroll small {font:13px/1.55 var(--mono);color:var(--muted)}
+.studio .table-scroll .unavailable {font-size:15px!important}
+.studio .episode-row strong {font:600 16px/1.55 var(--brand-body,Arial,Helvetica,sans-serif)}
 .studio .analytics-controls {margin:0 0 14px;gap:16px}
 .studio .analytics-table {max-height:560px;overflow:auto}
 .studio .analytics-table th[scope="row"] {min-width:260px;max-width:340px}
-.studio .analytics-table th[scope="row"] small {font-size:10px}
+.studio .analytics-table th[scope="row"] small {font-size:13px}
 .studio .notice,.studio .notice.quiet,.studio .empty {
-  font:12px/1.7 Arial,Helvetica,sans-serif;padding:14px 16px;margin:15px 0;border-color:var(--line);border-radius:7px;
+  font:15px/1.6 var(--brand-body,Arial,Helvetica,sans-serif);padding:16px 18px;margin:18px 0;border-color:var(--line);border-radius:7px;
 }
-.studio .notice.quiet {border-left:3px solid #d8dccc}
-.studio .text-links {font:11px/1.5 Arial,Helvetica,sans-serif;gap:17px}
-.studio .text-button {font:11px/1.5 Arial,Helvetica,sans-serif}
+.studio .notice.quiet {border-left:3px solid var(--line)}
+.studio .text-links {font:14px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);gap:18px}
+.studio .text-button {font:14px/1.55 var(--brand-body,Arial,Helvetica,sans-serif)}
 .studio .controls {padding:0;margin:16px 0}
 .studio .segmented {border:1px solid var(--line);border-radius:6px;overflow:hidden}
-.studio .segmented span {font:11px/1.4 Arial,Helvetica,sans-serif;padding:9px 12px}
+.studio .segmented span {font:14px/1.5 var(--brand-body,Arial,Helvetica,sans-serif);padding:11px 14px}
 .studio .segmented input:checked+span {background:var(--ink);color:var(--cream)}
 .studio .summary-strip {margin:14px 0;gap:12px}
 .studio .summary-strip>div {border:1px solid var(--line);border-radius:6px;padding:14px}
-.studio .summary-strip strong {font:600 27px/1.4 Arial,Helvetica,sans-serif}
-.studio .summary-strip small,.studio .summary-strip span {font:10px/1.6 Arial,Helvetica,sans-serif}
+.studio .summary-strip strong {font:600 34px/1.3 var(--brand-body,Arial,Helvetica,sans-serif);font-variant-numeric:tabular-nums}
+.studio .summary-strip small,.studio .summary-strip span {font:13px/1.55 var(--mono)}
 .studio .head-to-head {padding:22px 0 0;margin-top:24px;border-color:var(--line)}
 .studio .video-card,.studio .chart-panel,.studio .test-round,.studio .history-block {
   border-color:var(--line);border-radius:8px;background:var(--cream);
 }
 .studio .video-card {padding:18px}
-.studio .video-card-head p {font:500 14px/1.5 Arial,Helvetica,sans-serif}
-.studio .video-card dt {font:10px/1.5 Arial,Helvetica,sans-serif}
-.studio .video-card dd {font:600 23px/1.4 Arial,Helvetica,sans-serif}
+.studio .video-card-head p {font:500 16px/1.55 var(--brand-body,Arial,Helvetica,sans-serif)}
+.studio .video-card dt {font:13px/1.55 var(--brand-body,Arial,Helvetica,sans-serif)}
+.studio .video-card dd {font:600 32px/1.3 var(--brand-body,Arial,Helvetica,sans-serif);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .studio .chart-panel:not(.analytics-trend) {padding:20px;margin-top:20px}
-.studio .chart-panel h3 {font-size:15px}
-.studio .chart-panel text {font-family:Arial,Helvetica,sans-serif}
-.studio .chart-legend,.studio .video-card>a {font:11px/1.6 Arial,Helvetica,sans-serif}
-.studio .comparison-prompt {background:#eeeee6;border:1px solid var(--line);border-radius:7px;padding:16px;margin-top:18px}
-.studio .comparison-prompt p {font:12px/1.7 Arial,Helvetica,sans-serif;color:var(--ink)}
-.studio .comparison-prompt strong {font:600 12px/1.7 Arial,Helvetica,sans-serif;letter-spacing:0;margin-bottom:7px}
+.studio .chart-panel h3 {font-size:20px}
+.studio .chart-panel text {font-family:var(--brand-body,Arial,Helvetica,sans-serif);font-size:13px}
+.studio .chart-legend,.studio .video-card>a {font:14px/1.55 var(--brand-body,Arial,Helvetica,sans-serif)}
+.studio .comparison-prompt {background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:18px;margin-top:20px}
+.studio .comparison-prompt p {font:16px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);color:var(--ink)}
+.studio .comparison-prompt strong {font:600 16px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);letter-spacing:0;margin-bottom:8px}
 .studio .round-header {padding:17px 20px;border-color:var(--line)}
-.studio .round-header p,.studio .pair-card p,.studio .pair-card li {font:11px/1.7 Arial,Helvetica,sans-serif}
-.studio .pair-card h4 {font:600 16px/1.5 Arial,Helvetica,sans-serif;margin:12px 0}
-.studio .pair-card .share {font:600 28px/1.4 Arial,Helvetica,sans-serif}
-.studio .pair-card .share small,.studio .pair-card .record-status {font:10px/1.5 Arial,Helvetica,sans-serif}
-.studio .history-block>summary {font:600 14px/1.5 Arial,Helvetica,sans-serif;padding:17px}
+.studio .round-header p,.studio .pair-card p,.studio .pair-card li {font:14px/1.6 var(--brand-body,Arial,Helvetica,sans-serif)}
+.studio .pair-card h4 {font:600 18px/1.5 var(--brand-body,Arial,Helvetica,sans-serif);margin:14px 0}
+.studio .pair-card .share {font:600 34px/1.3 var(--brand-body,Arial,Helvetica,sans-serif);font-variant-numeric:tabular-nums}
+.studio .pair-card .share small,.studio .pair-card .record-status {font:13px/1.55 var(--mono)}
+.studio .pair-card summary {font:14px/1.55 var(--brand-body,Arial,Helvetica,sans-serif)}
+.studio .missing-image {font:13px/1.6 var(--brand-body,Arial,Helvetica,sans-serif)}
+.studio .history-block>summary {font:600 16px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);padding:18px}
 .studio .image-button img {border:0;border-radius:5px;outline:1px solid var(--line)}
+.studio .metadata-detail {font:14px/1.6 var(--brand-body,Arial,Helvetica,sans-serif)}
 .studio .notebook-layout {grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:24px}
 .studio .experiment-form {padding:22px;border-color:var(--line);border-radius:8px}
-.studio .notebook-guide {padding:19px;background:#eeeee6;color:var(--ink);border:1px solid var(--line);border-radius:8px}
-.studio .notebook-guide h3 {font:600 14px/1.5 Arial,Helvetica,sans-serif;margin:0 0 12px}
-.studio .notebook-guide ol {font:12px/1.7 Arial,Helvetica,sans-serif;margin-bottom:0}
+.studio .notebook-guide {padding:22px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:8px}
+.studio .notebook-guide h3 {font:600 18px/1.5 var(--brand-body,Arial,Helvetica,sans-serif);margin:0 0 14px}
+.studio .notebook-guide ol {font:16px/1.55 var(--brand-body,Arial,Helvetica,sans-serif);margin-bottom:0}
 .studio .notebook-guide li {margin:7px 0}
+.studio .notebook-note>span {font:13px/1.6 var(--mono)}
 .studio .saved-experiment {border-radius:7px}
-.studio .saved-experiment h4 {font:600 14px/1.5 Arial,Helvetica,sans-serif}
+.studio .saved-experiment h4 {font:600 18px/1.5 var(--brand-body,Arial,Helvetica,sans-serif)}
+.studio .saved-experiment p {font-size:16px;line-height:1.55}
+.studio .saved-experiment .note {font:13px/1.6 var(--brand-body,Arial,Helvetica,sans-serif)}
 .studio .method {margin:24px 0 16px;padding:14px 0;border-top:1px solid var(--line)}
-.studio .method summary {font-size:11px;color:var(--muted)}
-.studio footer {padding:16px 0;font-size:10px;color:var(--muted);border-color:var(--line)}
-.studio footer a {font-size:10px}
+.studio .method summary {font-size:14px;color:var(--muted)}
+.studio .method p {font-size:14px;line-height:1.6}
+.studio dialog p {font:14px/1.6 var(--brand-body,Arial,Helvetica,sans-serif)}
+.studio footer {padding:20px 0;font-size:13px;color:var(--muted);border-color:var(--line)}
+.studio footer a {font-size:14px}
 @media(min-width:1600px) {
   .studio .analytics-trend svg {min-height:330px}
+}
+@media(max-width:1350px) {
+  .studio-sidebar {width:200px}
+  .studio-app {margin-left:200px}
 }
 @media(max-width:1100px) {
   .studio main {padding:0 20px 20px}
@@ -188,7 +209,7 @@ body.studio {
   .studio .analytics-metrics>div:nth-child(3) {border-right:0}
   .studio .analytics-metrics>div:nth-child(n+4) {border-top:1px solid var(--line);padding-top:14px}
   .studio .analytics-metrics>div:nth-child(4) {padding-left:0}
-  .studio .analytics-metrics dd {font-size:29px}
+  .studio .analytics-metrics dd {font-size:34px}
   .studio .pair-selects {max-width:100%;gap:12px}
   .studio .pair-selects select {min-width:110px;max-width:240px}
 }
@@ -197,51 +218,57 @@ body.studio {
   .studio-brand {padding:0 0 10px}
   .studio-brand img {width:105px}
   .studio-sidebar nav {grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding-bottom:10px}
-  .studio-sidebar nav a {padding:9px 8px;justify-content:center;gap:6px;font-size:12px}
+  .studio-sidebar nav a {padding:10px 4px;justify-content:center;flex-direction:column;gap:5px;font-size:14px;min-width:0}
   .studio-sidebar svg {width:16px;height:16px}
   .studio-sidebar-bottom {grid-column:2;grid-row:1;align-self:center;margin:0;padding:0}
-  .studio-sidebar-bottom>a {font-size:11px;padding:7px 0 7px 7px;gap:5px}
+  .studio-sidebar-bottom>a {font-size:14px;padding:9px 0 9px 7px;gap:6px}
   .studio-sidebar-bottom .studio-site-link {display:none}
   .studio-app {margin-left:0}
-  .studio-header {height:55px;padding:0 16px}
+  .studio-header {min-height:70px;padding:10px 16px}
   .studio-header>div {gap:11px}
-  .studio-header span {font-size:10px}
-  .studio .studio-header h1 {font-size:18px}
+  .studio-header span {font-size:13px}
+  .studio .studio-header h1 {font-size:34px}
   .studio main {padding:0 16px 16px}
-  .studio .section-nav {gap:20px;overflow-x:auto;min-height:46px;margin-bottom:16px}
-  .studio .section-nav a:nth-child(n) {font-size:11px;padding:13px 0 10px;flex-shrink:0}
+  .studio .section-nav {gap:22px;overflow-x:auto;min-height:54px;margin-bottom:20px;max-width:100%}
+  .studio .section-nav a:nth-child(n) {font-size:14px;padding:16px 0 13px;flex-shrink:0}
   .studio .section-heading {gap:11px}
-  .studio .section-heading h2 {font-size:17px}
-  .studio .studio-toolbar {flex-wrap:nowrap}
-  .studio .studio-toolbar .button {flex-shrink:0;padding:7px 9px}
+  .studio .section-heading h2 {font-size:32px}
+  .studio .studio-toolbar {flex-wrap:wrap}
+  .studio .studio-toolbar .button {flex-shrink:0;padding:10px 12px}
   .studio .analytics-report,.studio .channel-overview {padding:15px 13px}
-  .studio .report-date {font-size:10px}
+  .studio .report-date {font-size:13px;overflow-wrap:anywhere}
+  .studio .analytics-metrics {grid-template-columns:repeat(2,minmax(0,1fr))}
   .studio .analytics-metrics>div {padding:10px 9px 13px}
-  .studio .analytics-metrics dt {font-size:10px}
-  .studio .analytics-metrics dd {font-size:24px;letter-spacing:-.5px}
+  .studio .analytics-metrics>div:nth-child(n) {padding:13px 9px;border:0;border-bottom:1px solid var(--line)}
+  .studio .analytics-metrics>div:nth-child(odd) {padding-left:0;border-right:1px solid var(--line)}
+  .studio .analytics-metrics dt {font-size:14px}
+  .studio .analytics-metrics dd {font-size:32px;letter-spacing:-.5px}
   .studio .report-details .analytics-metrics {grid-template-columns:repeat(2,minmax(0,1fr))}
   .studio .report-details .analytics-metrics>div:nth-child(n) {padding:10px;border:0}
   .studio .analytics-trend svg {min-height:190px}
-  .studio .analytics-trend label {width:auto}
-  .studio .analytics-trend select {width:138px}
+  .studio .analytics-trend label {width:100%;justify-content:space-between;flex-wrap:wrap}
+  .studio .analytics-trend select {width:min(215px,100%);max-width:100%}
   .studio .channel-breakdowns label {width:100%}
-  .studio .channel-breakdowns select {width:100%;flex:1}
+  .studio .channel-breakdowns label {flex-wrap:wrap}
+  .studio .channel-breakdowns select {width:100%;flex:1 1 190px}
+  .studio .table-scroll th,.studio .table-scroll td,.studio .table-scroll td.metric,.studio .table-scroll tbody th {font-size:14px}
+  .studio .table-scroll .unavailable {font-size:14px!important}
   .studio .table-scroll td:first-child {min-width:190px}
   .studio .analytics-daily td:first-child {min-width:110px}
-  .studio .analytics-daily th,.studio .analytics-daily td {font-size:11px}
+  .studio .analytics-daily th,.studio .analytics-daily td {font-size:14px}
   .studio .pair-selects select {max-width:none}
   .studio .notebook-layout {grid-template-columns:1fr}
   .studio .summary-strip {grid-template-columns:repeat(2,minmax(0,1fr))}
-  .studio .text-links {font-size:11px;gap:12px}
+  .studio .text-links {font-size:14px;gap:14px}
   .studio .segmented {width:auto}
   .studio footer {gap:12px}
 }
 @media(max-width:380px) {
-  .studio-sidebar nav a {font-size:11px;padding:9px 4px;gap:4px}
+  .studio-sidebar nav a {font-size:14px;padding:10px 3px;gap:5px}
   .studio main {padding-left:11px;padding-right:11px}
   .studio .section-nav {gap:17px}
   .studio-header span {display:none}
-  .studio .analytics-metrics dd {font-size:22px}
+  .studio .analytics-metrics dd {font-size:32px}
 }
 @media print {
   .studio-sidebar,.studio-header form,.studio .section-nav {display:none}

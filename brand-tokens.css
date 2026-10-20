@@ -1,0 +1,19 @@
+/* Shared with scranpints.com/branding and the main site's app/globals.css.
+   Display: Bulluck Stone. Body/navigation/buttons: Arial.
+   Short supporting labels: Courier New. Keep data in the body face. */
+:root {
+  --brand-paper: #fbf0df;
+  --brand-card: #fffaef;
+  --brand-ink: #151310;
+  --brand-red: #db0b19;
+  --brand-muted: #686158;
+  --brand-line: #d4c8b6;
+  --brand-body: Arial, Helvetica, sans-serif;
+  --brand-display: Bulluck, "Bulluck Stone", Impact, sans-serif;
+  --brand-mono: "Courier New", monospace;
+  --type-body: 1rem;
+  --type-control: .9375rem;
+  --type-label: .875rem;
+  --type-detail: .8125rem;
+  --type-data: clamp(2rem, 2.5vw, 2.375rem);
+}
