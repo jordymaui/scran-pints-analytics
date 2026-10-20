@@ -7,6 +7,7 @@ import { collectYouTubeEpisodes, commitYouTubeRefresh, decodeReport, REPORTS, AC
 import { metadataAudit, windowMetrics } from '../lib/workshop-model.mjs';
 import { normalizeYouTubeContentType } from '../lib/youtube-content-type.mjs';
 import { publicYouTubeFixture } from './fixtures/public-youtube.mjs';
+import { CHANNEL_BREAKDOWN_REPORTS, UPLOAD_REPORTS, UPLOAD_ACTIVITY_METRICS } from '../lib/youtube-breakdowns.mjs';
 
 const ids = ['abcdefghijk', 'lmnopqrstuv'];
 const capturedAt = '2026-09-08T12:00:00Z';
@@ -42,6 +43,7 @@ function mockYouTube({
   inventoryIds,
   defaultContentType = 'videoOnDemand',
   channelVideoCount, channelId = 'our-channel',
+  requestedEnd = '2026-09-06',
 } = {}) {
   const calls = [];
   const catalog = [...ids.map(id => ({ id })), ...extraVideos];
@@ -77,6 +79,16 @@ function mockYouTube({
     })) });
     assert.equal(url.origin, 'https://youtubeanalytics.googleapis.com');
     assert.equal(url.searchParams.get('ids'), 'channel==MINE');
+    if (!url.searchParams.get('filters')?.startsWith('video==') &&
+      url.searchParams.get('metrics') !== ACTIVITY_METRICS.join(',')) {
+      const definition = Object.values(CHANNEL_BREAKDOWN_REPORTS).find(value =>
+        value.dimensions === url.searchParams.get('dimensions') &&
+        value.metrics === url.searchParams.get('metrics') &&
+        (value.filters || null) === url.searchParams.get('filters'));
+      assert.ok(definition, 'only declared optional channel reports are requested');
+      if (definition.maxResults) assert.equal(url.searchParams.get('maxResults'), String(definition.maxResults));
+      return response(report(definition, []));
+    }
     if (!url.searchParams.has('filters')) {
       assert.equal(url.searchParams.get('metrics'), ACTIVITY_METRICS.join(','));
       const channelType = url.searchParams.has('dimensions') ? 'channelDaily' : 'channelAggregate';
@@ -86,20 +98,37 @@ function mockYouTube({
         return response(report(REPORTS.aggregate, channelAggregateRows));
       }
       assert.equal(url.searchParams.get('dimensions'), 'day');
-      assert.equal(url.searchParams.get('endDate'), '2026-09-06');
+      assert.equal(url.searchParams.get('endDate'), requestedEnd);
       const startIndex = Number(url.searchParams.get('startIndex') || 1) - 1;
       return response(report(REPORTS.daily, channelDays.slice(startIndex, startIndex + 200).map(day => [day, ...channelDailyValues])));
     }
     const requestedIds = url.searchParams.get('filters').replace('video==', '').split(',');
     const requested = requestedIds.map(id => byId.get(id));
-    assert.equal(url.searchParams.get('startDate'), requested.map(video => pacificDate(publication(video))).sort()[0]);
     const dimension = url.searchParams.get('dimensions') || '';
+    const uploadType = Object.keys(UPLOAD_REPORTS).find(type =>
+      UPLOAD_REPORTS[type].metrics === url.searchParams.get('metrics') &&
+      [UPLOAD_REPORTS[type].dimensions || '', ['video', UPLOAD_REPORTS[type].dimensions].filter(Boolean).join(',')].includes(dimension) &&
+      (UPLOAD_REPORTS[type].metrics !== REPORTS[type]?.metrics || dimension.startsWith('video,')));
+    if (uploadType) {
+      const definition = { ...UPLOAD_REPORTS[uploadType], ...(dimension ? { dimensions: dimension } : {}) };
+      const prefix = id => dimension.startsWith('video') ? [id] : [];
+      const values = UPLOAD_ACTIVITY_METRICS.map(key =>
+        ACTIVITY_METRICS.includes(key) ? activity[ACTIVITY_METRICS.indexOf(key)] : 1);
+      if (uploadType === 'retention') return response(report(definition,
+        emptyRetention ? [] : [[.5, .4, .3, 1, 2, 3]]));
+      if (uploadType === 'traffic') return response(report(definition,
+        requestedIds.map(id => [...prefix(id), 'YT_SEARCH', 30, 90])));
+      if (uploadType === 'aggregate') return response(report(definition,
+        requestedIds.map(id => [...prefix(id), ...values])));
+      return response(report(definition, requestedIds.map(id => [...prefix(id), '2026-09-02', ...values])));
+    }
+    assert.equal(url.searchParams.get('startDate'), requested.map(video => pacificDate(publication(video))).sort()[0]);
     const type = Object.keys(REPORTS).find(key => (REPORTS[key].dimensions || '') === dimension);
     assert.ok(type);
     assert.equal(url.searchParams.get('metrics'), REPORTS[type].metrics);
     if (type === failReport) return { ok: false, status: 403, json: async () => ({ error: 'sensitive body should never be printed' }) };
     if (type === 'contentType' || type === 'discovery') {
-      assert.equal(url.searchParams.get('endDate'), '2026-09-06', 'format discovery uses the requested reporting cutoff');
+      assert.equal(url.searchParams.get('endDate'), requestedEnd, 'format discovery uses the requested reporting cutoff');
       const rows = requested.flatMap(video => {
         const formats = video.type === null ? [] : Array.isArray(video.type) ? video.type : [wrongType ? 'shorts' : video.type || defaultContentType];
         return formats.map(format => [...(type === 'discovery' ? [unexpectedTypeId ? 'UNEXPECTED1' : video.id] : []), format, 30, 90]);
@@ -213,7 +242,8 @@ test('channel daily pagination keeps returned gaps and genuine zeros without fil
   const paginated = mockYouTube({ channelPublishedAt: '2026-01-01T08:00:00Z', channelDays });
   const collected = await collect(snapshot(), paginated);
   assert.equal(collected.snapshot.channelAnalytics.daily.length, channelDays.length);
-  assert.equal(paginated.calls.filter(call => call.url.searchParams.get('dimensions') === 'day' && !call.url.searchParams.has('filters')).length, 2);
+  assert.equal(paginated.calls.filter(call => call.url.searchParams.get('dimensions') === 'day' &&
+    call.url.searchParams.get('metrics') === ACTIVITY_METRICS.join(',') && !call.url.searchParams.has('filters')).length, 2);
 });
 
 test('incomplete or malformed channel activity rejects the refresh without redating prior channel Analytics', async () => {
@@ -246,7 +276,7 @@ test('empty retention preserves old curve and explicitly keeps its earlier sourc
   assert.equal(result.snapshot.videos[0].retentionSource.end, before.apiThrough);
   assert.equal(result.snapshot.videos[0].retentionSource.capturedAt, before.capturedAt);
   assert.equal(result.snapshot.videos[0].refreshReports.retention, 'no-rows-retained-previous');
-  assert.equal(result.warnings.length, 2);
+  assert.equal(result.warnings.filter(warning => warning.includes('no new retention rows')).length, 2);
 });
 
 test('partial API failure rejects the whole refresh without changing original data', async () => {
@@ -262,12 +292,27 @@ test('owner mismatch, Shorts classification, missing old rows and missing metric
   }
 });
 
-test('missing authorization and current-day requests fail without a network call', async () => {
+test('missing authorization and future-day requests fail without a network call', async () => {
   let calls = 0;
   const fetchImpl = async () => { calls++; throw new Error('unexpected'); };
   await assert.rejects(collect(snapshot(), { env: {}, fetchImpl }), error => error.code === 'not-configured');
-  await assert.rejects(collect(snapshot(), { end: '2026-09-08', fetchImpl }), error => error.code === 'configuration');
+  await assert.rejects(collect(snapshot(), { end: '2026-09-09', fetchImpl }), error => error.code === 'configuration');
   assert.equal(calls, 0);
+});
+
+test('today may be requested but the provider response still determines the actual cutoff', async () => {
+  const result = await collect(snapshot(), { ...mockYouTube({ requestedEnd: '2026-09-08' }), end: '2026-09-08' });
+  assert.equal(result.snapshot.youtubeRefresh.requestedEnd, '2026-09-08');
+  assert.equal(result.snapshot.apiThrough, '2026-09-03');
+  assert.equal(result.snapshot.uploadAnalytics.dateRange.end, '2026-09-03');
+});
+
+test('channel history cannot silently drop a previously returned daily observation', async () => {
+  const original = snapshot();
+  original.channelAnalytics = { daily: [{ day: '2026-08-05', views: 1 }] };
+  const copy = structuredClone(original);
+  await assert.rejects(collect(original, mockYouTube()), error => error.code === 'coverage-loss');
+  assert.deepEqual(original, copy);
 });
 
 test('report decoding follows returned headers and rejects incomplete metric arrays', () => {
@@ -407,8 +452,11 @@ test('validated same-channel public inventory supplies missing IDs that are rech
   assert.deepEqual(mock.calls.filter(call => call.url.pathname.endsWith('/videos'))
     .flatMap(call => call.url.searchParams.get('id').split(',')), [...ids, ...extraVideos.map(video => video.id)]);
   assert.equal(result.snapshot.channelAnalytics.aggregate.views, 300);
-  assert.ok(Object.values(result.snapshot.channelBreakdowns).every(entry => entry.status === 'failed'),
-    'unsupported optional breakdown fixtures do not discard successful core Analytics');
+  assert.ok(Object.values(result.snapshot.channelBreakdowns).every(entry => entry.status === 'no-rows'),
+    'empty optional breakdowns do not discard successful core Analytics');
+  assert.deepEqual(new Set(result.snapshot.uploadAnalytics.videos.map(video => video.id)),
+    new Set([...ids, ...extraVideos.map(video => video.id)]), 'all public formats enter the per-upload ledger');
+  assert.equal(result.snapshot.uploadAnalytics.videos.filter(video => video.creatorContentType === 'SHORTS').length, 6);
 
   const missingOld = await collect(before, mockYouTube({
     extraVideos, inventoryIds: [ids[1]], channelId: before.publicReport.channel.id,

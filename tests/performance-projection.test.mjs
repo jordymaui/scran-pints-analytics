@@ -86,19 +86,42 @@ test('invalid channel dates, identities and native metrics cannot enter public p
   }
 });
 
-test('Shorts keeps stored period totals and publishes only available views in daily rows', () => {
+test('legacy Shorts keeps stored period metrics and missing daily metrics remain unavailable', () => {
   const performance = projectShortsPerformance(shorts());
-  assert.deepEqual(Object.keys(performance.totals), metricKeys);
+  assert.deepEqual(new Set(Object.keys(performance.totals)), new Set([...metricKeys, 'engagedViews']));
   assert.equal(performance.totals.watchHours, 2.5);
   assert.equal(performance.totals.likes, -1);
   assert.equal(performance.totals.subscribersNet, -2);
   assert.equal(performance.totals.subscribersGained, null);
   assert.equal(performance.totals.subscribersLost, null);
+  assert.equal(performance.totals.engagedViews, 3141592);
   assert.deepEqual(performance.daily.map(row => row.views), [0, 80]);
   for (const row of performance.daily) {
     for (const key of metricKeys.filter(key => key !== 'views')) assert.equal(row[key], null);
+    assert.equal(row.engagedViews, null);
   }
-  assert.doesNotMatch(JSON.stringify(performance), /engagedViews|3141592|content|scope|accountLabel/);
+  assert.doesNotMatch(JSON.stringify(performance), /content|scope|accountLabel/);
+});
+
+test('full Shorts daily history projects every retained metric without creating absent days', () => {
+  const input = shorts();
+  input.metrics.subscribersGained = 4;
+  input.metrics.subscribersLost = 6;
+  input.daily = [
+    { day: '2026-10-14', views: 0, engagedViews: 0, watchHours: 0, likes: -1, comments: 0, shares: 0,
+      subscribersGained: 1, subscribersLost: 2, subscribersNet: -1 },
+    { day: '2026-10-16', views: 80, engagedViews: 20, watchHours: 2.5, likes: 0, comments: 2, shares: 3,
+      subscribersGained: 3, subscribersLost: 4, subscribersNet: -1 },
+  ];
+  const output = projectShortsPerformance(input);
+  assert.equal(output.daily.length, 2);
+  assert.deepEqual(output.daily.map(row => row.date), ['2026-10-14', '2026-10-16']);
+  for (let index = 0; index < output.daily.length; index++) {
+    const { day, ...metrics } = input.daily[index];
+    assert.deepEqual(output.daily[index], { date: day, ...metrics });
+  }
+  assert.equal(output.totals.subscribersGained, 4);
+  assert.equal(output.totals.subscribersLost, 6);
 });
 
 test('Shorts publication validates source provenance and dates beyond the storage schema', () => {
@@ -131,11 +154,13 @@ test('public endpoint retains independent counter/performance dates and excludes
   assert.equal(youtube.performance.totals.views, 120);
   assert.equal(short.performance.capturedAt, shorts().capturedAt);
   assert.equal(short.metrics.views, 80);
+  assert.equal(short.metrics.engagedViews, 3141592);
+  assert.equal(short.performance.totals.engagedViews, 3141592);
   assert.equal(short.status, 'snapshot');
   assert.match(short.scope, /do not add/);
   assert.deepEqual(youtube.content.map(row => row.id), publicYouTubeFixture().content.map(row => row.id));
   assert.doesNotMatch(JSON.stringify(report),
-    /PRIVATE_REFRESH_TOKEN|PRIVATE_WORKSHOP_NOTE|PRIVATE_HISTORY_RECORD|NONPUBLIC_CONTENT_TITLE|channelAnalytics|channelBreakdowns|viewerPercentage|72\.123456|3141592|refreshToken/);
+    /PRIVATE_REFRESH_TOKEN|PRIVATE_WORKSHOP_NOTE|PRIVATE_HISTORY_RECORD|NONPUBLIC_CONTENT_TITLE|channelAnalytics|channelBreakdowns|viewerPercentage|72\.123456|refreshToken/);
 });
 
 test('invalid performance cannot replace valid counters or invalidate another source', async () => {

@@ -1,5 +1,6 @@
 import { csvCell } from '/lib/report-model.mjs';
 import { selectPeriod, summarizeMetric, chartSeries } from '/lib/dashboard-metrics.mjs';
+import { createReportRefresh } from '/refresh.js';
 const $ = selector => document.querySelector(selector);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = value => Number.isFinite(value) ? new Intl.NumberFormat('en-GB',{maximumFractionDigits:1}).format(value) : '—';
@@ -19,6 +20,22 @@ function performance(s){
  if(!s.daily?.length||!s.dateRange)return null;
  return {capturedAt:s.capturedAt,dateRange:{start:s.dateRange.start,end:s.dateRange.end,timeZone:s.dateRange.timezone},daily:s.daily.map(row=>({date:row.day,views:row.views,watchHours:null,likes:null,comments:null,shares:null,subscribersNet:null})),totals:s.metrics};
 }
+const reportRefresh = createReportRefresh({
+ getCoverage: () => (report?.sources || []).flatMap(source => {
+  const saved = performance(source);
+  return [
+   ...(saved?.dateRange ? [{ label: `${label(source)} Analytics`, start: saved.dateRange.start, end: saved.dateRange.end, capturedAt: saved.capturedAt }] : []),
+   ...(source.counterScope === 'public-channel' ? [{ label: 'YouTube public counters', kind: 'counters', capturedAt: source.capturedAt }] : []),
+  ];
+ }),
+ reloadReport: async () => {
+  const response = await fetch('/api/report', { cache: 'no-store' });
+  if (!response.ok) throw Error('Report unavailable');
+  const updated = await response.json();
+  if (updated.schemaVersion !== 1 || !Array.isArray(updated.sources) || !updated.sources.length) throw Error('Invalid report');
+  report = updated; render();
+ },
+});
 function metricSummary(key){
  const result=summarizeMetric(period,key);
  const p=performance(selected());
@@ -63,8 +80,8 @@ function notes(s){const p=performance(s);return `<details class="coverage-detail
 function render(){
  const s=selected();sourceId=s.id;period=selectPeriod(performance(s),range,custom);
  const title=page==='videos'?'Videos':page==='yeet'?'YEET':'Overview';document.title=`${title} · Scran & Pints`;
- $('#workspace').innerHTML=`${sidebar()}<div class="app"><header class="topbar"><div class="title-group"><h1>${title}</h1><span class="tracking"><i class="dot"></i>${s.content.length?`${s.content.length} videos tracked`:esc(label(s))}</span></div><div class="top-actions"><span class="sync-label">${s.performance?'YouTube Analytics':s.metrics?'Saved report':'Awaiting connection'}</span><a href="/workshop.html">Studio ↗</a></div></header><main id="main">${toolbar(s)}${sponsor?campaigns():''}${accountStrip(s)}${page==='videos'?videos(s):performance(s)?`${graphPanel(s)}<div class="lower-grid">${topVideos(s)}${interactions()}</div>`:s.metrics?`<section class="panel empty"><h2>Daily analytics unavailable</h2><p>Channel counters are shown above. A dated Analytics report is needed for the performance graph.</p><a class="control" href="/connections.html">Connections →</a></section><div class="lower-grid">${topVideos(s)}</div>`:`<section class="panel empty"><span class="empty-icon">◷</span><h2>${esc(label(s))} is not connected</h2><p>Views, engagement and growth will appear here when reporting is connected.</p><a class="control" href="/connections.html">Set up connection →</a></section>`}${notes(s)}<footer class="page-footer"><span>Scran & Pints</span><div><a href="/privacy.html">Privacy</a><a href="/terms.html">Usage notice</a></div></footer></main></div>`;
- bind();renderVideoRows();bindVideoDetails();
+ $('#workspace').innerHTML=`${sidebar()}<div class="app"><header class="topbar"><div class="title-group"><h1>${title}</h1><span class="tracking"><i class="dot"></i>${s.content.length?`${s.content.length} videos tracked`:esc(label(s))}</span></div><div class="top-actions"><span class="sync-label">${s.performance?'YouTube Analytics':s.metrics?'Saved report':'Awaiting connection'}</span><a class="studio-shortcut" href="/workshop.html">Studio ↗</a><div data-report-refresh></div></div></header><main id="main">${toolbar(s)}${sponsor?campaigns():''}${accountStrip(s)}${page==='videos'?videos(s):performance(s)?`${graphPanel(s)}<div class="lower-grid">${topVideos(s)}${interactions()}</div>`:s.metrics?`<section class="panel empty"><h2>Daily analytics unavailable</h2><p>Channel counters are shown above. A dated Analytics report is needed for the performance graph.</p><a class="control" href="/connections.html">Connections →</a></section><div class="lower-grid">${topVideos(s)}</div>`:`<section class="panel empty"><span class="empty-icon">◷</span><h2>${esc(label(s))} is not connected</h2><p>Views, engagement and growth will appear here when reporting is connected.</p><a class="control" href="/connections.html">Set up connection →</a></section>`}${notes(s)}<footer class="page-footer"><span>Scran & Pints</span><div><a href="/privacy.html">Privacy</a><a href="/terms.html">Usage notice</a></div></footer></main></div>`;
+ bind();renderVideoRows();bindVideoDetails();reportRefresh.mount($('[data-report-refresh]'));
 }
 function bind(){
  $('#platform-select').onchange=e=>{sourceId=e.target.value;metric='views';pageIndex=0;search='';publication='all';custom=null;range='28d';syncUrl();render();};

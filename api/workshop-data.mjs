@@ -1,7 +1,7 @@
 import { json } from '../lib/auth.mjs';
 import { loadReportingInputs } from '../lib/cloud-report.mjs';
 import { validateSocialImport } from '../lib/social-schema.mjs';
-import { validateChannelBreakdowns } from '../lib/youtube-breakdowns.mjs';
+import { validateChannelBreakdowns, validateUploadAnalytics } from '../lib/youtube-breakdowns.mjs';
 import { projectStudioSnapshot } from '../lib/studio-projection.mjs';
 
 const ACTIVITY_FIELDS = ['views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
@@ -53,11 +53,17 @@ export function createWorkshopDataHandler({ loadInputs = loadReportingInputs } =
         ? validateSocialImport({ schemaVersion: 1, sources: [shorts] }).sources[0] : null;
       const channelAnalytics = snapshot.channelAnalytics ? validateChannelAnalytics(snapshot.channelAnalytics) : null;
       let channelBreakdowns = null;
+      let uploadAnalytics = null;
       try {
         if (snapshot.channelBreakdowns) channelBreakdowns = validateChannelBreakdowns(snapshot.channelBreakdowns);
       } catch { /* Optional malformed reports never hide valid core Analytics. */ }
+      try {
+        if (snapshot.uploadAnalytics?.channelId === 'UCAX4l1JUAymaMHVKiRFzK-A') {
+          uploadAnalytics = validateUploadAnalytics(snapshot.uploadAnalytics);
+        }
+      } catch { /* Retain core reports when an optional upload report is invalid. */ }
       return json(res, 200, projectStudioSnapshot(snapshot, {
-        historicalSnapshot, channelAnalytics, channelBreakdowns, shortsAnalytics,
+        historicalSnapshot, channelAnalytics, channelBreakdowns, shortsAnalytics, uploadAnalytics,
         storageStatus, snapshotOrigin: origins.youtube,
       }));
     } catch { json(res, 503, { error: 'workshop_snapshot_unavailable' }); }

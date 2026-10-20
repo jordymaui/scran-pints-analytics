@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, readdir, mkdir, rm } from 'node:fs/promises';
 import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateSocialImport } from '../lib/social-schema.mjs';
+import { validateSocialImport, YOUTUBE_ANALYTICS_PROVENANCE } from '../lib/social-schema.mjs';
 import { importSocial } from '../scripts/import-social.mjs';
 
 function source(id = 'instagram') {
@@ -39,6 +39,35 @@ test('preserves unavailable values, true zero and negative net changes, and sort
   assert.equal(result.sources[0].metrics.subscribersNet, -1);
   assert.equal(result.sources[0].metrics.watchHours, 0.5);
   assert.deepEqual(result.sources[0].daily.map(row => row.day), ['2026-10-01', '2026-10-02']);
+});
+
+test('official Shorts accepts complete daily metric rows and subscriber totals without weakening other sources', () => {
+  const fixture = source('youtube-shorts');
+  fixture.provenance = { kind: 'official-api', label: YOUTUBE_ANALYTICS_PROVENANCE };
+  fixture.metrics = { ...fixture.metrics, subscribersGained: 2, subscribersLost: 3 };
+  fixture.daily = [{ day: '2026-10-01', views: 0, engagedViews: 0, watchHours: 0, likes: -1,
+    comments: 0, shares: 1, subscribersGained: 2, subscribersLost: 3, subscribersNet: -1 }];
+  const output = validateSocialImport(document(fixture)).sources[0];
+  assert.deepEqual(output.daily, fixture.daily);
+  assert.equal(output.metrics.subscribersLost, 3);
+  for (const change of [
+    row => { row.id = 'instagram'; },
+    row => { row.provenance.label = 'Unverified export'; },
+    row => { row.daily[0].accessToken = 'PRIVATE'; },
+    row => { delete row.daily[0].watchHours; },
+    row => { row.daily[0].subscribersNet = 8; },
+    row => { row.daily[0].likes = -0.5; },
+    row => { row.daily[0].engagedViews = -1; },
+    row => { row.metrics.subscribersNet = 8; },
+    row => { delete row.metrics.subscribersLost; },
+  ]) {
+    const changed = structuredClone(fixture); change(changed);
+    assert.throws(() => validateSocialImport(document(changed)));
+  }
+  const legacy = source('youtube-shorts');
+  legacy.provenance = fixture.provenance;
+  assert.deepEqual(validateSocialImport(document(legacy)).sources[0].daily,
+    [...legacy.daily].sort((a, b) => a.day.localeCompare(b.day)));
 });
 
 test('rejects unknown fields and potential credentials without echoing their contents', () => {

@@ -49,7 +49,15 @@ test('signed likes require the exact Analytics source and never apply to content
     { id: 'instagram' }, { id: 'tiktok' },
     { provenance: { kind: 'platform-export', label: YOUTUBE_ANALYTICS_PROVENANCE } },
     { provenance: { kind: 'official-api', label: 'YouTube Data API public counters' } },
-  ]) assert.throws(() => validateSocialImport(document({ ...source, ...change })), /non-negative/);
+  ]) {
+    const changed = structuredClone({ ...source, ...change });
+    // Non-YouTube sources use the baseline schema. Keep this assertion focused
+    // on signed likes rather than the additional Shorts-only history fields.
+    delete changed.metrics.subscribersGained;
+    delete changed.metrics.subscribersLost;
+    changed.daily = changed.daily.map(({ day, views }) => ({ day, views }));
+    assert.throws(() => validateSocialImport(document(changed)), /non-negative/);
+  }
   const withContent = { ...source, content: [{
     id: 'abcdefghijk', title: 'Public counter', url: 'https://www.youtube.com/shorts/abcdefghijk',
     publishedAt: capturedAt, thumbnail: null, views: 1, likes: -1, comments: 0, shares: 0,

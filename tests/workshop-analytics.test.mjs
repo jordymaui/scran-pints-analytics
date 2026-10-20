@@ -132,6 +132,7 @@ test('overview render uses native channel totals, separate Shorts dates, and dat
   element('#analytics-video').value = 'CWBBRExPJ0I';
   const context = vm.createContext({
     analyticsMetrics, analyticsDailySeries,
+    createReportRefresh: () => ({ mount() {} }),
     document: { querySelector: element }, Intl, Date, Number, String, Map, Set,
   });
   const source = (await readFile(new URL('../workshop.js', import.meta.url), 'utf8'))
@@ -161,7 +162,7 @@ test('overview render uses native channel totals, separate Shorts dates, and dat
 });
 
 test('Studio tabs open deep links and notebook navigation without discarding panel state', async () => {
-  const ids = ['analytics', 'compare', 'packaging', 'metadata', 'notebook'];
+  const ids = ['analytics', 'compare', 'packaging', 'metadata', 'notebook', 'uploads'];
   const panels = ids.map(id => ({ id, hidden: false, draftValue: id === 'notebook' ? 'unsaved hypothesis' : '' }));
   const links = ids.map(id => ({
     dataset: { studioTab: id }, attributes: {}, events: {},
@@ -175,6 +176,7 @@ test('Studio tabs open deep links and notebook navigation without discarding pan
     document: { querySelectorAll: selector => selector === '[data-studio-panel]' ? panels : links },
     window: { addEventListener: (name, callback) => { events[name] = callback; } },
     location, history: { replaceState: (_state, _title, hash) => { location.hash = hash; } },
+    createReportRefresh: () => ({ mount() {} }),
     Intl, Date, Number, String, Map, Set,
   });
   const source = (await readFile(new URL('../workshop.js', import.meta.url), 'utf8'))
@@ -199,4 +201,35 @@ test('Studio tabs open deep links and notebook navigation without discarding pan
   vm.runInContext("teamAccess = false; selectStudioSection('notebook');", context);
   assert.equal(panels[4].hidden, true);
   assert.equal(panels[0].hidden, false);
+  location.hash = '#uploads';
+  events.hashchange();
+  assert.deepEqual(panels.filter(panel => !panel.hidden).map(panel => panel.id), ['uploads']);
+});
+
+test('Shorts charts retain every collected metric, negative adjustments and missing legacy fields', async () => {
+  const context = vm.createContext({
+    analyticsMetrics, analyticsDailySeries, createReportRefresh: () => ({ mount() {} }),
+    Intl, Date, Number, String, Map, Set,
+  });
+  const source = (await readFile(new URL('../workshop.js', import.meta.url), 'utf8'))
+    .replace(/^import .*;\r?\n/gm, '').replace(/\r?\n(?:checkTeamAccess|load)\(\);/g, '');
+  vm.runInContext(source, context);
+  context.rows = [
+    { day: '2026-10-01', views: 12, engagedViews: 7, watchHours: 2.5, likes: -1,
+      comments: 3, shares: 2, subscribersGained: 1, subscribersLost: 3, subscribersNet: -2 },
+    { day: '2026-10-03', views: 0 },
+  ];
+  context.range = { start: '2026-10-01', end: '2026-10-03', timezone: 'America/Los_Angeles' };
+  const chart = metric => vm.runInContext(`shortsMetric = ${JSON.stringify(metric)}; analyticsTrend(rows, range, 'Shorts', 'shorts', 28, true);`, context);
+  const hours = chart('watchHours');
+  assert.match(hours, /2026-10-01: 2\.5 watch hours/);
+  assert.match(hours, /1 \/ 3 dates have watch hours/);
+  assert.match(hours, /<th scope="col">Engaged views<\/th>/);
+  assert.match(hours, /No returned row/);
+  assert.match(hours, /Not collected/);
+  assert.doesNotMatch(hours, /NaN|undefined|Infinity/);
+  assert.match(chart('likes'), /2026-10-01: -1 likes/);
+  assert.match(chart('subscribersNet'), /2026-10-01: -2 net subscribers/);
+  assert.match(chart('engagedViews'), /2026-10-01: 7 engaged views/);
+  assert.match(chart('views'), /2026-10-03: 0 views/);
 });

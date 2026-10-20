@@ -1,4 +1,6 @@
 @import url('/brand-tokens.css');
+@import url('/refresh.css');
+@import url('/upload-analytics.css');
 @font-face{font-family:"DM Mono";font-style:normal;font-weight:400;font-display:swap;src:url("/fonts/38f8abefb8f8-latin.woff2") format("woff2")}
 @font-face{font-family:"Oswald";font-style:normal;font-weight:600;font-display:swap;src:url("/fonts/57baaaa1a342-latin.woff2") format("woff2")}
 @font-face{font-family:"Young Serif";font-style:normal;font-weight:400;font-display:swap;src:url("/fonts/ade2a8d72ee1-latin.woff2") format("woff2")}
@@ -280,3 +282,6 @@ body.studio {
 }
 
 body.studio:not(.team-access) :is([data-studio-tab="notebook"],#notebook,#start-pair-experiment,[data-draft-test]){display:none!important}
+.studio-header .studio-header-actions {margin-left:auto;gap:14px;flex-shrink:0}
+@media(max-width:760px){.studio-header{flex-wrap:wrap}.studio-header .studio-header-actions{gap:10px}.studio-header #team-controls-link,.studio-header #team-sign-out .text-button{font-size:13px;padding-left:0}}
+@media(max-width:420px){.studio-header .studio-header-actions{width:100%;justify-content:flex-end}.studio-header .studio-header-actions [data-report-refresh]{margin-left:auto}}
