@@ -84,6 +84,22 @@ test('a complete claim with missing reports or inconsistent inventory counts can
   }
 });
 
+test('a counted inventory gap remains a readable partial private report', async () => {
+  const snapshot = discoveredSnapshot();
+  Object.assign(snapshot.youtubeRefresh.discovery, {
+    status: 'partial', inventoryComplete: false,
+    channelPublicVideoCount: snapshot.youtubeRefresh.discovery.publicUploadsCount + 6,
+    supplementalPublicIdsCount: 0,
+  });
+  const input = await loadReportingInputs(cloudOptions(snapshot));
+  assert.equal(input.origins.youtube, 'cloud');
+  assert.equal(input.storageStatus, 'cloud');
+  assert.equal(youtubeCoverage(input.snapshot).status, 'partial');
+  assert.equal(input.snapshot.videos.length, snapshot.videos.length);
+  snapshot.youtubeRefresh.discovery.inventoryComplete = true;
+  assert.equal((await loadReportingInputs(cloudOptions(snapshot))).origins.youtube, 'bundled');
+});
+
 test('discovered videos may lack a thumbnail without fabricating one, but unsafe thumbnail URLs fail closed', async () => {
   const snapshot = discoveredSnapshot();
   snapshot.videos.at(-1).thumb = null;

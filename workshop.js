@@ -1,4 +1,5 @@
-import { windowMetrics, groupTests, metadataAudit, validateNotebook, mergeNotebookChanges, workshopThumbnail, workshopPackage } from '/lib/workshop-model.mjs';
+import { windowMetrics, groupTests, metadataAudit, validateNotebook, mergeNotebookChanges, workshopThumbnail, workshopPackage, analyticsMetrics, analyticsDailySeries } from '/lib/workshop-model.mjs';
+import { csvCell } from '/lib/report-model.mjs';
 
 const $ = selector => document.querySelector(selector);
 const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -38,6 +39,175 @@ function imageHTML(path, caption, evidence = false) {
   const url = asset(path);
   if (!url) return '<div class="missing-image">Image not recovered<br>See the saved evidence notes.</div>';
   return `<button class="image-button" type="button" data-preview="${escapeHTML(url)}" data-caption="${escapeHTML(caption)}" aria-label="${escapeHTML(`Enlarge ${evidence ? 'saved screenshot for' : 'thumbnail paired with'} ${caption}`)}"><img loading="lazy" src="${escapeHTML(url)}" alt="${escapeHTML(evidence ? `Saved test screenshot: ${caption}` : `Thumbnail paired with: ${caption}`)}"></button>${evidence ? '<p>Original test screenshot · separate thumbnail not recovered</p>' : ''}`;
+}
+
+const analyticsFields = [
+  ['views', 'Views', 0], ['watchHours', 'Watch hours', 1],
+  ['averageViewDuration', 'Avg. view seconds', 1], ['averageViewPercentage', 'Avg. % watched', 1],
+  ['likes', 'Likes', 0], ['comments', 'Comments', 0], ['shares', 'Shares', 0],
+  ['subscribersGained', 'Subscribers gained', 0], ['subscribersLost', 'Subscribers lost', 0],
+  ['subscribersNet', 'Net subscribers', 0],
+];
+const channelBreakdownViews = {
+  traffic: { label: 'Traffic sources', dimensions: [['insightTrafficSourceType', 'Traffic source']],
+    note: 'How viewers reached the channel’s videos, using YouTube’s native source categories.' },
+  country: { label: 'Countries', dimensions: [['country', 'Country']],
+    note: 'Country describes the location reported for the activity. ZZ means the country is unknown.' },
+  device: { label: 'Devices', dimensions: [['deviceType', 'Device']],
+    note: 'Views and watch time by YouTube device category; these are not unique viewer counts.' },
+  subscribed: { label: 'Subscriber status', dimensions: [['subscribedStatus', 'Subscriber status']],
+    note: 'Subscription status is measured when the activity happened. This is not a list or count of current subscribers.' },
+  format: { label: 'Content formats', dimensions: [['creatorContentType', 'Format']],
+    note: 'YouTube’s native content classification, including Shorts and live streams where returned. Format reporting is available from 1 January 2019.' },
+  demographics: { label: 'Age & gender', dimensions: [['ageGroup', 'Age group'], ['gender', 'Gender']],
+    note: 'Native viewer percentages describe the logged-in audience represented by YouTube’s demographic report. Missing groups are unavailable; percentages are not converted into viewer counts.' },
+};
+const metricValue = (metrics, [key, , digits]) => key === 'averageViewPercentage' ? percent(metrics[key]) : number(metrics[key], digits);
+const episodeTitle = video => video.metadata?.title || video.title || video.name;
+function episodeRange(video) {
+  return {
+    start: video.analyticsSource?.start || video.reportingPublishedDate ||
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(video.publishedAt)),
+    end: video.analyticsSource?.end || data.apiThrough,
+    timezone: video.analyticsSource?.timezone || 'America/Los_Angeles',
+  };
+}
+function reportDates(report) {
+  const range = report.dateRange;
+  return `${date(range.start)} – ${date(range.end)} · ${range.timezone} · collected ${date(report.capturedAt)}`;
+}
+function metricLedger(metrics, fields = analyticsFields) {
+  return `<dl class="analytics-metrics">${fields.map(field => `<div><dt>${escapeHTML(field[1])}</dt><dd>${escapeHTML(metricValue(metrics, field))}</dd></div>`).join('')}</dl>`;
+}
+function analyticsTrend(rows, range, label, key, limit = 28, viewsOnly = false) {
+  const series = analyticsDailySeries(rows, range, limit);
+  if (!series.length) return '<p class="empty">No dated daily report was collected.</p>';
+  const present = series.filter(row => Number.isFinite(row.views));
+  const maximum = Math.max(1, ...present.map(row => row.views));
+  const x = index => 62 + (series.length === 1 ? .5 : index / (series.length - 1)) * 790;
+  const y = value => 205 - value / maximum * 170;
+  const segments = [];
+  let points = [];
+  series.forEach((row, index) => {
+    if (row.views === null) { if (points.length) segments.push(points); points = []; }
+    else points.push([x(index), y(row.views), row]);
+  });
+  if (points.length) segments.push(points);
+  const grid = [0, .5, 1].map(fraction => `<line x1="62" x2="852" y1="${y(maximum * fraction)}" y2="${y(maximum * fraction)}" stroke="#d8cbb8"/><text x="50" y="${y(maximum * fraction) + 4}" text-anchor="end">${number(maximum * fraction)}</text>`).join('');
+  const chart = present.length ? `<svg viewBox="0 0 900 245" role="img" aria-labelledby="${key}-title ${key}-description"><title id="${key}-title">${escapeHTML(label)} daily views</title><desc id="${key}-description">Returned daily views from ${series[0].day} to ${series.at(-1).day}. Missing dates are gaps. Exact values follow.</desc>${grid}${segments.map(segment => `<polyline points="${segment.map(point => point.slice(0, 2).join(',')).join(' ')}" fill="none" stroke="#db0b19" stroke-width="3"/>`).join('')}${series.length <= 90 ? segments.flat().map(([cx, cy, row]) => `<circle cx="${cx}" cy="${cy}" r="3" fill="#db0b19"><title>${row.day}: ${number(row.views)} views</title></circle>`).join('') : ''}<text x="62" y="235">${escapeHTML(date(series[0].day))}</text><text x="852" y="235" text-anchor="end">${escapeHTML(date(series.at(-1).day))}</text></svg>` : '<p class="empty">No views were returned for these dates.</p>';
+  const fields = viewsOnly ? analyticsFields.slice(0, 1) : analyticsFields;
+  return `<div class="chart-panel analytics-trend"><div class="section-heading compact"><h4>${escapeHTML(label)} · daily views</h4><label>Chart dates<select data-trend-range="${key}"><option value="7" ${limit === 7 ? 'selected' : ''}>Last 7 dates</option><option value="28" ${limit === 28 ? 'selected' : ''}>Last 28 dates</option><option value="all" ${limit === null ? 'selected' : ''}>All dates · up to 5,000</option></select></label></div>${chart}<p class="note">${present.length} / ${series.length} dates have a returned view count. Gaps are unavailable, not zero. ${limit === null && series[0].day > range.start ? 'This long report shows its latest 5,000 calendar dates. ' : ''}This selector changes the chart and daily table only; aggregate cards keep their full stated window.</p><details class="analytics-daily"><summary>Exact daily values &amp; coverage</summary><div class="table-scroll" tabindex="0" role="region" aria-label="${escapeHTML(label)} daily values"><table><thead><tr><th scope="col">Date</th>${fields.map(field => `<th scope="col">${escapeHTML(field[1])}</th>`).join('')}<th scope="col">Coverage</th></tr></thead><tbody>${series.map(row => `<tr><td>${row.day}</td>${fields.map(field => `<td class="metric">${escapeHTML(metricValue(row, field))}</td>`).join('')}<td>${row.coverage}</td></tr>`).join('')}</tbody></table></div></details></div>`;
+}
+function renderChannelAnalytics() {
+  const report = data.channelAnalytics;
+  const fallbackStart = report?.coverage?.startBasis === 'earliest-known-public-upload';
+  const core = report ? `<article class="analytics-report"><div class="section-heading compact"><h3>YouTube channel · all formats</h3><span class="pill">Native channel aggregate</span></div><p class="note">${escapeHTML(reportDates(report))}</p>${metricLedger(analyticsMetrics(report.aggregate))}<p class="note">Source: YouTube Analytics API, unfiltered channel aggregate and daily reports. Includes all formats reported by YouTube. ${fallbackStart ? 'The window starts at the earliest known public upload; earlier channel history is not covered.' : 'The window starts at the channel creation date.'} These totals are supplied separately from the episode inventory and may include activity not represented in the current public upload list. Native average values are not recomputed from individual videos.</p><div id="channel-trend">${analyticsTrend(report.daily, report.dateRange, 'Channel', 'channel')}</div></article>`
+    : '<div class="notice quiet"><strong>Channel Analytics has not been collected yet.</strong><p>After the channel owner connects YouTube reporting, refresh YouTube in Connections. The saved episode evidence remains available below.</p></div>';
+  $('#channel-analytics').innerHTML = `${core}<article class="analytics-report channel-breakdowns"><div class="section-heading compact"><h3>Where the views come from</h3><label>Channel breakdown<select id="channel-breakdown">${Object.entries(channelBreakdownViews).map(([id, view]) => `<option value="${id}">${escapeHTML(view.label)}</option>`).join('')}</select></label></div><div id="channel-breakdown-detail" aria-live="polite"></div></article>`;
+  renderChannelBreakdown();
+}
+function breakdownDimension(value, key) {
+  if (key === 'country') {
+    if (value === 'ZZ') return 'Unknown country (ZZ)';
+    try { return `${new Intl.DisplayNames(['en-GB'], { type: 'region' }).of(value)} (${value})`; } catch { return value; }
+  }
+  const names = {
+    VIDEO_ON_DEMAND: 'Full videos', SHORTS: 'Shorts', LIVE_STREAM: 'Live streams',
+    STORY: 'Stories', UNSPECIFIED: 'Unspecified', SUBSCRIBED: 'Subscribed', UNSUBSCRIBED: 'Not subscribed',
+  };
+  return names[value] || value;
+}
+function renderChannelBreakdown() {
+  const selected = $('#channel-breakdown').value;
+  const id = Object.hasOwn(channelBreakdownViews, selected) ? selected : 'traffic';
+  const view = channelBreakdownViews[id];
+  const entry = data.channelBreakdowns?.[id];
+  if (!entry) {
+    $('#channel-breakdown-detail').innerHTML = `<p class="empty">No valid saved ${escapeHTML(view.label.toLowerCase())} report is available. Refresh YouTube in <a href="/connections.html">Connections</a> to collect it.</p><p class="note">${escapeHTML(view.note)}</p>`;
+    return;
+  }
+  const statuses = {
+    collected: 'Collected successfully.',
+    'no-rows': 'The latest refresh returned no rows. This report is unavailable, not zero.',
+    failed: 'The latest refresh could not collect this report.',
+    'no-rows-retained': 'The latest refresh returned no rows. Showing the earlier report with its original dates.',
+    'failed-retained': 'The latest refresh could not collect this report. Showing the earlier report with its original dates.',
+  };
+  const attempt = `<p class="note">${escapeHTML(statuses[entry.status] || 'Report unavailable.')} Latest attempt: ${escapeHTML(date(entry.attemptedAt))}, requested ${escapeHTML(date(entry.attemptedRange.start))} – ${escapeHTML(date(entry.attemptedRange.end))} · ${escapeHTML(entry.attemptedRange.timezone)}.</p>`;
+  if (!entry.report) {
+    $('#channel-breakdown-detail').innerHTML = `${attempt}<p class="empty">No saved rows are available for this breakdown.</p><p class="note">${escapeHTML(view.note)}</p>`;
+    return;
+  }
+  const report = entry.report;
+  const demographic = id === 'demographics';
+  const rows = [...report.rows].sort((a, b) => (demographic ? b.viewerPercentage - a.viewerPercentage : b.views - a.views));
+  const table = `<div class="table-scroll breakdown-table" tabindex="0" role="region" aria-label="${escapeHTML(view.label)}"><table><thead><tr>${view.dimensions.map(([, label]) => `<th scope="col">${escapeHTML(label)}</th>`).join('')}${demographic ? '<th scope="col">Viewer percentage</th>' : '<th scope="col">Views</th><th scope="col">Watch hours</th>'}</tr></thead><tbody>${rows.map(row => `<tr>${view.dimensions.map(([key]) => `<td>${escapeHTML(breakdownDimension(row[key], key))}</td>`).join('')}${demographic ? `<td class="metric">${percent(row.viewerPercentage)}</td>` : `<td class="metric">${number(row.views)}</td><td class="metric">${number(row.estimatedMinutesWatched / 60, 1)}</td>`}</tr>`).join('')}</tbody></table></div>`;
+  $('#channel-breakdown-detail').innerHTML = `${attempt}<p class="note"><strong>${escapeHTML(reportDates(report))}</strong> · YouTube Analytics API</p>${table}<p class="note">${escapeHTML(view.note)} Reports may omit categories and do not provide their own daily completeness marker. The displayed range is the requested report window; rows are not added to or used to replace the channel total.</p>`;
+}
+function renderShortsAnalytics() {
+  const report = data.shortsAnalytics;
+  if (!report) {
+    $('#shorts-analytics').innerHTML = '<div class="notice quiet"><strong>No saved private Shorts report is available.</strong><p>Use Refresh private Shorts in Connections after the YouTube reporting grant is saved. No Shorts figures are inferred from the public channel counter or the episode catalog.</p></div>';
+    return;
+  }
+  const fields = [['views', 'Views', 0], ['engagedViews', 'Engaged views', 0], ['watchHours', 'Watch hours', 1], ['likes', 'Likes', 0], ['comments', 'Comments', 0], ['shares', 'Shares', 0], ['subscribersNet', 'Net subscribers', 0]];
+  $('#shorts-analytics').innerHTML = `<article class="analytics-report"><div class="section-heading compact"><h3>YouTube Shorts</h3><span class="pill">Saved private report</span></div><p class="note">${escapeHTML(reportDates(report))}</p>${metricLedger(report.metrics, fields)}<p class="note">Source: ${escapeHTML(report.provenance.label)}. ${escapeHTML(report.scope)}</p><p class="note">Shorts totals sum returned daily Shorts rows. Views and engaged views are separate source metrics. Daily watch time, subscriber gains/losses and individual-Short records are not retained in this saved report.</p><div id="shorts-trend">${analyticsTrend(report.daily, report.dateRange, 'Shorts', 'shorts', 28, true)}</div></article>`;
+}
+function episodeAnalyticsRows() {
+  const query = $('#analytics-search').value.trim().toLocaleLowerCase();
+  const sort = $('#analytics-sort').value;
+  return data.videos.filter(video => `${video.name} ${episodeTitle(video)}`.toLocaleLowerCase().includes(query))
+    .map(video => ({ video, metrics: analyticsMetrics(video.apiAggregate) }))
+    .sort((a, b) => sort === 'publishedAt' ? b.video.publishedAt.localeCompare(a.video.publishedAt) :
+      (b.metrics[sort] ?? -Infinity) - (a.metrics[sort] ?? -Infinity));
+}
+function renderEpisodeAnalytics() {
+  $('#episode-analytics-body').innerHTML = episodeAnalyticsRows().map(({ video, metrics }) => {
+    const range = episodeRange(video);
+    return `<tr><th scope="row"><a href="https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}" target="_blank" rel="noopener noreferrer">${escapeHTML(episodeTitle(video))} ↗</a><small>${escapeHTML(video.name)} · published ${escapeHTML(date(video.publishedAt))}</small><small>${escapeHTML(date(range.start))} – ${escapeHTML(date(range.end))}<br>Collected ${escapeHTML(date(video.analyticsSource?.capturedAt || data.capturedAt))}</small></th>${analyticsFields.map(field => `<td class="metric">${escapeHTML(metricValue(metrics, field))}</td>`).join('')}</tr>`;
+  }).join('') || '<tr><td colspan="11">No included episode matches this search.</td></tr>';
+}
+function renderEpisodeAnalyticsDetail() {
+  const video = videoFor($('#analytics-video').value);
+  if (!video) return;
+  const rows = [...(video.traffic || [])].sort((a, b) => (b.views ?? -1) - (a.views ?? -1));
+  const source = video.trafficSource;
+  const capture = source?.capturedAt || data.capturedAt;
+  const end = source?.end || data.apiThrough;
+  const traffic = rows.length ? `<div class="table-scroll" tabindex="0" role="region" aria-label="Episode traffic sources"><table><thead><tr><th scope="col">YouTube traffic source</th><th scope="col">Views</th><th scope="col">Watch hours</th></tr></thead><tbody>${rows.map(row => `<tr><td>${escapeHTML(row.insightTrafficSourceType)}</td><td class="metric">${number(row.views)}</td><td class="metric">${number(Number.isFinite(row.estimatedMinutesWatched) ? row.estimatedMinutesWatched / 60 : null, 1)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty">No traffic-source rows were collected for this episode.</p>';
+  $('#episode-analytics-detail').innerHTML = `<div id="episode-trend">${analyticsTrend(video.daily, episodeRange(video), video.name, 'episode')}</div><article class="analytics-report"><h4>How viewers found this episode</h4>${rows.length ? `<p class="note">YouTube Analytics API · ${escapeHTML(date(source?.start || episodeRange(video).start))} – ${escapeHTML(date(end))} · collected ${escapeHTML(date(capture))}. ${video.refreshReports?.traffic === 'no-rows-retained-previous' ? 'Older traffic report retained because the latest refresh returned no rows.' : ''} Traffic reports can omit or suppress detail and do not provide their own daily completeness marker.</p>` : ''}${traffic}</article>`;
+}
+function initializeAnalytics() {
+  renderChannelAnalytics();
+  renderShortsAnalytics();
+  $('#episode-analytics-note').textContent = `${data.videos.length} included full episodes. Each native aggregate covers that video's own publication-to-cutoff window in Pacific time; different video ages are not a controlled comparison. Video-filtered subscriber gains/losses cover watch-page attribution and are not channel totals. Missing values are not collected.`;
+  $('#analytics-video').innerHTML = data.videos.map(video => `<option value="${escapeHTML(video.id)}">${escapeHTML(video.name)}</option>`).join('');
+  renderEpisodeAnalytics();
+  renderEpisodeAnalyticsDetail();
+  $('#analytics-search').addEventListener('input', renderEpisodeAnalytics);
+  $('#analytics-sort').addEventListener('change', renderEpisodeAnalytics);
+  $('#analytics-video').addEventListener('change', renderEpisodeAnalyticsDetail);
+  $('#analytics').addEventListener('change', event => {
+    if (event.target.id === 'channel-breakdown') { renderChannelBreakdown(); return; }
+    const key = event.target.dataset.trendRange;
+    if (!key) return;
+    const limit = event.target.value === 'all' ? null : Number(event.target.value);
+    if (key === 'channel') $('#channel-trend').innerHTML = analyticsTrend(data.channelAnalytics.daily, data.channelAnalytics.dateRange, 'Channel', key, limit);
+    if (key === 'shorts') $('#shorts-trend').innerHTML = analyticsTrend(data.shortsAnalytics.daily, data.shortsAnalytics.dateRange, 'Shorts', key, limit, true);
+    if (key === 'episode') {
+      const video = videoFor($('#analytics-video').value);
+      $('#episode-trend').innerHTML = analyticsTrend(video.daily, episodeRange(video), video.name, key, limit);
+    }
+    document.querySelector(`[data-trend-range="${key}"]`)?.focus();
+  });
+  $('#export-episode-analytics').addEventListener('click', () => {
+    const rows = [['video_id', 'title', 'start', 'end', 'captured_at', ...analyticsFields.map(field => field[0])],
+      ...episodeAnalyticsRows().map(({ video, metrics }) => {
+        const range = episodeRange(video);
+        return [video.id, episodeTitle(video), range.start, range.end, video.analyticsSource?.capturedAt || data.capturedAt, ...analyticsFields.map(field => metrics[field[0]])];
+      })];
+    download('scran-pints-private-episode-analytics.csv', rows.map(row => row.map(csvCell).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
+  });
 }
 
 function renderSummary() {
@@ -382,6 +552,7 @@ function initialize() {
   const sourceText = `Saved reporting evidence · API through ${date(data.apiThrough)} · collected ${date(data.capturedAt)} · historical Studio cards ${date(data.studioCapturedAt)}`;
   $('#source-stamp').textContent = sourceText;
   $('#method-dates').textContent = sourceText;
+  initializeAnalytics();
   renderSummary();
   renderComparison();
   renderHeadToHead();

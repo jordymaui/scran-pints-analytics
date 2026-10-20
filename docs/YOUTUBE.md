@@ -6,7 +6,7 @@ The normal workflow is hosted on Vercel. No local process or manually copied ref
 2. Add the exact authorised redirect URI `https://scran-pints-analytics.vercel.app/api/connections/youtube?action=callback` to its Web OAuth client. If the deployment origin changes, the registered URI must match `APP_ORIGIN` exactly, including the query string.
 3. Add `YOUTUBE_CLIENT_ID` and `YOUTUBE_CLIENT_SECRET` to the server's Vercel environment. Configure team sign-in, the server-only Supabase storage key and the cloud schema as described in the deployment documentation.
 4. Sign in to `/connections.html` with an allowlisted team Google account and choose **Connect YouTube**. Select the owner or Brand Account for Scran & Pints. The callback verifies channel `UCAX4l1JUAymaMHVKiRFzK-A` before saving anything.
-5. Choose **Refresh episodes** and **Refresh Shorts** separately. Successful authorised collections are saved to private cloud storage for the team Workshop; each report shows its own coverage and collection date. Existing reports remain available when a refresh fails. Public YouTube reporting uses a separate Data API collection and does not publish these OAuth Analytics reports.
+5. Choose **Refresh YouTube** and **Refresh private Shorts** separately. Successful authorised collections are saved to private cloud storage for the team Workshop; each report shows its own coverage and collection date. Existing reports remain available when a refresh fails. **Refresh YouTube** also updates independent public Data API counters when `YOUTUBE_PUBLIC_API_KEY` is configured, including before owner consent is complete. It does not publish OAuth Analytics reports.
 
 The reporting grant uses signed state, PKCE and HttpOnly flow cookies and revalidates the team session on return. Only the refresh credential is stored in the server-only connection table; access tokens are not returned to the browser or persisted by this flow. The Data and Analytics scopes are read-only. An account with the wrong channel, missing offline access, missing reporting scopes or additional write scopes is rejected. Google sign-in for team identity is a separate flow. [Google server-side OAuth](https://developers.google.com/youtube/data/guides/auth/server-side-web-apps)
 
@@ -21,6 +21,8 @@ Format comes from the Analytics `creatorContentType` dimension. Only an unambigu
 `youtubeRefresh.discovery` records the public inventory count, confirmed and included full episodes, excluded formats, unclassified IDs, uploads awaiting report data and publications after the requested reporting cutoff. Coverage is labelled partial while those gaps remain. New uploads without daily or aggregate data are excluded visibly, not counted as zero. Format data begins in 2019; a video with no usable format activity may remain unclassified.
 
 The current safeguards stop the entire collection above 5,000 inventoried uploads or 1,000 confirmed full episodes, on incomplete pagination, or when the hosted job deadline is exceeded. They retain the previous snapshot rather than claim a truncated inventory is complete. Larger catalogs require a resumable collection design before raising these limits.
+
+Valid duplicate playlist entries are deduplicated. The collector also reconciles the owner playlist with a validated, same-channel public inventory already saved by the public collector, then verifies every candidate's current metadata and ownership. Inventory completeness is checked against the channel's native public video count; a mismatch remains an explicit coverage gap.
 
 ## Reporting permissions
 
@@ -61,7 +63,7 @@ npm test
 npm run build
 ```
 
-The date is an example; select the intended reporting cutoff each time. The collector derives its processed cutoff from the latest returned channel-level daily row using the exact activity metric set requested for each video. It then bounds per-video daily and aggregate queries by that date, recording `coverageBasis: channel-daily-same-metrics`. Channel values are used only as an availability signal and are never added to episode totals. A quiet video's missing latest-day row does not hold the entire report behind; its individual daily coverage and gaps remain visible. The requested trailing date is never presented as collected coverage. YouTube dates are Pacific and can span 23 or 25 hours at daylight-saving changes. [Response availability](https://developers.google.com/youtube/analytics/reference/reports/query#parameters), [reporting dates](https://developers.google.com/youtube/analytics/dimensions#Time_Periods)
+The date is an example; select the intended reporting cutoff each time. The collector derives its processed cutoff from the latest returned channel-level daily row using the exact activity metric set requested for each video. It then bounds per-video daily and aggregate queries by that date, recording `coverageBasis: channel-daily-same-metrics`. Native channel daily and aggregate reports are retained separately for the private Workshop and are never added to episode totals. A quiet video's missing latest-day row does not hold the entire report behind; its individual daily coverage and gaps remain visible. The requested trailing date is never presented as collected coverage. YouTube dates are Pacific and can span 23 or 25 hours at daylight-saving changes. [Response availability](https://developers.google.com/youtube/analytics/reference/reports/query#parameters), [reporting dates](https://developers.google.com/youtube/analytics/dimensions#Time_Periods)
 
 ## What is collected
 
@@ -71,12 +73,21 @@ Each included video's activity, retention and traffic reports use `filters=video
 | --- | --- | --- |
 | Daily activity | `day` | Views, estimated minutes watched, average view duration/percentage, likes, comments, shares, subscribers gained/lost |
 | Aggregate activity | None | Same metric set as daily activity |
-| Channel availability | `day`, no video filter | Same metric set as daily activity; values used only to find the processed date |
+| Channel daily activity | `day`, no video filter | Same metric set as daily activity; also establishes the processed date |
+| Channel aggregate | None, no video filter | Same metric set, native channel totals and averages across all formats |
 | Content verification | `video,creatorContentType` for multi-ID batches; `creatorContentType` for one ID | Views, estimated minutes watched |
 | Retention | `elapsedVideoTimeRatio` | Audience watch ratio, relative retention performance |
 | Traffic sources | `insightTrafficSourceType` | Views, estimated minutes watched |
 
 These are separate supported report combinations. Traffic sources deliberately exclude average view duration, which is not supported by the channel traffic-source report. Retention uses one video filter. No impressions, CTR, native test shares or revenue are invented from these reports. [Supported channel reports](https://developers.google.com/youtube/analytics/channel_reports)
+
+The private channel report starts at the channel's creation date when valid, with an explicit fallback to the earliest known public upload. Its aggregate and daily rows share the returned reporting cutoff. Native channel subscribers gained/lost include channel-wide activity; per-video subscriber attribution is limited to the watch page. The Workshop keeps these scopes separate and presents Shorts with its independently collected reporting window.
+
+The private channel overview also requests traffic source, country, device, subscribed status and content format, each with views and estimated minutes watched. A separate age/gender report supplies native viewer percentages. These optional breakdowns retain their own dates and availability state; an empty or failed report cannot invalidate the core collection or redate older evidence. Their query end is a bound, not a daily completeness guarantee. Demographic detail can be withheld by YouTube.
+
+Content-type matching accepts the documented enums and the exact lower/camel-case aliases observed in Analytics responses. Native signed integer `likes` values are preserved as supplied; they are not clamped or interpreted as dislikes. Public Data API counters and unrelated metrics retain their non-negative validation.
+
+The public dashboard retains a bounded history of native public channel counters, showing exact capture timestamps. These observations show changes between captures; they do not reconstruct daily Analytics views or publish private channel reports.
 
 `videos.list` separately supplies dated title, description, returned tags, thumbnail URLs, duration and public counters in `video.metadata`. Metadata is current at capture; public counters are not historic-window Analytics counts. A missing tags field is recorded as no returned tags and distinguished from an explicitly empty list. Thumbnail URLs are recorded, not downloaded; the image served at a URL may change later. The Workshop exposes these fields under Metadata. [Video resource fields](https://developers.google.com/youtube/data/reference/rest/v3/videos#snippet)
 
