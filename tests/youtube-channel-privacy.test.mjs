@@ -41,9 +41,9 @@ function shortsAnalytics() {
     daily: [{ day: '2026-10-16', views: 730000111 }], content: [],
   };
 }
-const privatePattern = /channelAnalytics|shortsAnalytics|channelBreakdowns|viewerPercentage|73000022[12]|37\.123456|PRIVATE_EVIDENCE/;
+const privatePattern = /channelAnalytics|shortsAnalytics|channelBreakdowns|PRIVATE_EVIDENCE/;
 
-test('only selected channel and Shorts performance enters public output; raw reports and audiences stay excluded', async () => {
+test('only selected performance and audience fields enter public output; raw reports stay excluded', async () => {
   for (const mode of ['current', 'missing-public', 'invalid-public']) {
     const bundled = await readBundledInputs();
     const snapshot = structuredClone(bundled.snapshot);
@@ -64,6 +64,9 @@ test('only selected channel and Shorts performance enters public output; raw rep
     const report = await loadPublicReport(options);
     assert.doesNotMatch(JSON.stringify(report), privatePattern, mode);
     assert.equal(report.sources[0].performance.totals.views, 730000001);
+    assert.equal(report.sources[0].audience.country.report.rows[0].views, 730000221);
+    assert.equal(report.sources[0].audience.demographics.report.rows[0].viewerPercentage, 37.123456);
+    assert.equal(report.sources[0].audience.country.report.capturedAt, BREAKDOWNS_CAPTURE);
     assert.equal(report.sources[0].performance.capturedAt, PRIVATE_CAPTURE);
     assert.equal(report.sources[1].performance.totals.views, 730000111);
     assert.equal(report.sources[1].performance.totals.engagedViews, 730000112);

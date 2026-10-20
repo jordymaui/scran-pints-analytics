@@ -285,3 +285,7 @@ body.studio:not(.team-access) :is([data-studio-tab="notebook"],#notebook,#start-
 .studio-header .studio-header-actions {margin-left:auto;gap:14px;flex-shrink:0}
 @media(max-width:760px){.studio-header{flex-wrap:wrap}.studio-header .studio-header-actions{gap:10px}.studio-header #team-controls-link,.studio-header #team-sign-out .text-button{font-size:13px;padding-left:0}}
 @media(max-width:420px){.studio-header .studio-header-actions{width:100%;justify-content:flex-end}.studio-header .studio-header-actions [data-report-refresh]{margin-left:auto}}
+
+/* Official white YEET mark, displayed on its approved dark background. */
+.yeet-nav-mark{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;padding:7px 10px;border-radius:5px;background:#16171d;line-height:1}
+.yeet-nav-mark img{display:block;width:72px;height:auto;max-width:100%;object-fit:contain}
