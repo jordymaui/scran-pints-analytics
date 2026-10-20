@@ -24,7 +24,20 @@
     </section>
     <div id="load-state" class="notice" role="status">Loading the workshop…</div>
     <div id="workshop-content" hidden>
-      <nav class="section-nav" aria-label="Workshop sections"><a href="#compare">01 / Compare</a><a href="#packaging">02 / Packaging</a><a href="#metadata">03 / Metadata</a><a href="#notebook">04 / Notebook</a></nav>
+      <nav class="section-nav" aria-label="Workshop sections"><a href="#analytics">Analytics</a><a href="#compare">Compare</a><a href="#packaging">Packaging</a><a href="#metadata">Metadata</a><a href="#notebook">Notebook</a></nav>
+      <section id="analytics" class="work-section analytics-section">
+        <div class="section-heading"><div><span class="eyebrow">PRIVATE YOUTUBE ANALYTICS</span><h2>The channel. The Shorts. The episodes.</h2></div><a class="button secondary" href="/connections.html">Refresh reporting ↗</a></div>
+        <p class="section-intro">Channel totals come from YouTube's channel report. Each collection below keeps its own date range; episode and Shorts figures are not added to the channel total.</p>
+        <div id="channel-analytics"></div>
+        <div id="shorts-analytics"></div>
+        <div class="section-heading analytics-heading"><div><span class="eyebrow">FULL EPISODE LEDGER</span><h3>Every included episode, every collected metric.</h3></div><button id="export-episode-analytics" class="button secondary" type="button">Export episode metrics ↓</button></div>
+        <p id="episode-analytics-note" class="note"></p>
+        <div class="controls analytics-controls"><label class="search-label">Find an episode<input id="analytics-search" type="search" placeholder="Search titles…"></label><label class="inline-label">Sort by<select id="analytics-sort"><option value="views">Views</option><option value="watchHours">Watch hours</option><option value="publishedAt">Newest published</option><option value="subscribersNet">Net subscribers</option></select></label></div>
+        <div class="table-scroll analytics-table" tabindex="0" role="region" aria-label="All episode Analytics metrics"><table><caption class="sr-only">Native per-video aggregate reports, each since publication</caption><thead><tr><th scope="col">Episode / source dates</th><th scope="col">Views</th><th scope="col">Watch hours</th><th scope="col">Avg. seconds</th><th scope="col">Avg. % watched</th><th scope="col">Likes</th><th scope="col">Comments</th><th scope="col">Shares</th><th scope="col">Subs gained</th><th scope="col">Subs lost</th><th scope="col">Net subs</th></tr></thead><tbody id="episode-analytics-body"></tbody></table></div>
+        <div class="section-heading analytics-heading"><h3>Daily performance &amp; traffic sources</h3><label class="analytics-video-label">Episode<select id="analytics-video"></select></label></div>
+        <div id="episode-analytics-detail"></div>
+        <p class="notice quiet">Impressions and CTR remain in the dated Studio evidence below. Channel breakdowns above show only saved native reports. Revenue and individual-Short reports have not been collected here. Missing data stays unavailable.</p>
+      </section>
       <section class="summary-strip" id="summary-strip" aria-label="Evidence coverage"></section>
       <div id="discovery-note" class="notice quiet" aria-label="Upload discovery coverage"></div>
       <section id="compare" class="work-section">

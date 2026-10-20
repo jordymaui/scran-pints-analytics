@@ -69,6 +69,27 @@ test('YouTube paginates a full first page without dropping or double-counting ro
   assert.equal(result.metrics.views, 4020);
 });
 
+test('YouTube selects observed camelCase content types alongside documented aliases without guessing unknowns', async () => {
+  const base = { env: { YOUTUBE_ACCESS_TOKEN: 'test-access' },
+    start: '2026-10-01', end: '2026-10-19', capturedAt: CAPTURED };
+  const result = await collectYouTubeShorts({ ...base, fetchImpl: async () => json(youtubeReport([
+    youtubeRow('2026-10-01', 'shorts', { likes: -1 }),
+    youtubeRow('2026-10-02', 'SHORTS'),
+    youtubeRow('2026-10-03', 'videoOnDemand', { views: 9000 }),
+    youtubeRow('2026-10-03', 'creatorContentTypeUnspecified', { views: 9000 }),
+    youtubeRow('2026-10-03', 'unrecognizedShortFormat', { views: 9000 }),
+  ])) });
+  assert.equal(result.metrics.views, 40);
+  assert.equal(result.metrics.likes, 1);
+  assert.deepEqual(result.daily.map(row => row.day), ['2026-10-01', '2026-10-02']);
+  await assert.rejects(collectYouTubeShorts({ ...base, fetchImpl: async () => json(youtubeReport([
+    youtubeRow('2026-10-01', 'shorts'), youtubeRow('2026-10-01', 'SHORTS'),
+  ])) }), /repeated/);
+  await assert.rejects(collectYouTubeShorts({ ...base, fetchImpl: async () => json(youtubeReport([
+    youtubeRow('2026-10-01', 'creatorContentTypeUnspecified'),
+  ])) }), /no Shorts rows/);
+});
+
 test('YouTube refreshes a server-side OAuth grant and never puts it in the request URL', async () => {
   let request;
   const token = await getGoogleAccessToken({
