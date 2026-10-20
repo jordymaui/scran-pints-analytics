@@ -24,6 +24,7 @@
 .studio .ua-table-scroll table {width:100%;border-collapse:collapse}
 .studio .ua-table-scroll th,.studio .ua-table-scroll td {padding:14px 15px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font:14px/1.6 var(--brand-body,Arial,sans-serif);font-variant-numeric:tabular-nums;white-space:nowrap}
 .studio .ua-table-scroll thead th {position:sticky;top:0;z-index:1;background:var(--paper);color:var(--muted);font-weight:500}
+.studio .ua-table-scroll tbody th {background:transparent;color:var(--ink)}
 .studio .ua-table-scroll tbody tr:last-child :is(th,td) {border-bottom:0}
 .studio .ua-table-scroll small {display:block;color:var(--muted);font:12px/1.6 var(--mono);margin-top:4px}
 .studio .ua-catalog td:last-child {min-width:220px;white-space:normal}

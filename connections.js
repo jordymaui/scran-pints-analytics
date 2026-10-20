@@ -60,7 +60,7 @@ function renderStatus() {
     status.textContent = !verified ? 'Status unavailable' : connected ? 'Connected' : publicReady ? 'Public counters ready' : 'Setup needed';
     status.className = `pill ${verified && (connected || publicReady) ? 'connected' : 'pending'}`;
     const lastSync = platform.lastSync;
-    const syncLabel = !lastSync ? 'No run recorded' : lastSync.status === 'ready' ? lastSync.errorCode === 'partial_refresh' ? 'Partly completed · previous capture kept' : 'Completed' :
+    const syncLabel = !lastSync ? 'No run recorded' : lastSync.status === 'ready' ? lastSync.errorCode === 'partial_refresh' ? 'Saved with gaps' : 'Completed' :
       { failed: 'Failed · previous data kept', blocked: 'Setup blocked', busy: 'Already running', 'not-connected': 'Not connected' }[lastSync.status] || 'Needs attention';
     card.querySelector('[data-field="details"]').innerHTML = [
       ['Reporting connection', !verified ? 'Could not be checked' : connected ? `Saved ${formatDate(platform.connectedAt)}` : 'Not connected'],

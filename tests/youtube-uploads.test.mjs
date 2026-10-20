@@ -24,10 +24,12 @@ function queryFixture({ fail, empty, omitDay = false, calls = [], activity = met
     calls.push(request);
     const { type, videoIds } = request;
     if (type === fail) throw Error('PRIVATE_PROVIDER_MESSAGE token=secret');
-    if (type === 'retention') {
+    if (type === 'retention' || type === 'retentionSegments') {
       assert.equal(videoIds.length, 1, 'YouTube retention cannot use a multi-video filter');
-      return videoIds[0] === empty ? [] : [{ elapsedVideoTimeRatio: .5, audienceWatchRatio: 1.2,
-        relativeRetentionPerformance: .6, startedWatching: 0, stoppedWatching: 4, totalSegmentImpressions: 12 }];
+      const values = { elapsedVideoTimeRatio: .5, audienceWatchRatio: 1.2,
+        relativeRetentionPerformance: .6, startedWatching: 0, stoppedWatching: 4, totalSegmentImpressions: 12 };
+      return videoIds[0] === empty ? [] : [Object.fromEntries(
+        ['elapsedVideoTimeRatio', ...request.report.metrics.split(',')].map(key => [key, values[key]]))];
     }
     return videoIds.flatMap(id => {
       if (id === empty) return [];
@@ -143,4 +145,75 @@ test('traffic batches respect video-times-day bounds and retention concurrency s
   assert.ok(calls.filter(call => call.type === 'traffic').every(call => call.videoIds.length * dates <= 50000));
   assert.ok(calls.filter(call => call.type === 'retention').every(call => call.videoIds.length === 1));
   assert.equal(Object.keys(UPLOAD_REPORTS).length, 4);
+});
+
+test('failed large daily batches retry each affected upload without repeating successful batches', async () => {
+  const many = Array.from({ length: 184 }, (_, index) => ({ ...catalog[0],
+    id: `video${String(index).padStart(6, '0')}`, thumbnail: null }));
+  let active = 0, maximum = 0;
+  const retries = [];
+  const query = queryFixture();
+  const result = await collectUploadAnalytics({ ...defaults, catalog: many,
+    coverage: { ...defaults.coverage, publicUploadsCount: 184, channelPublicVideoCount: 184 },
+    query: async request => {
+      active++; maximum = Math.max(maximum, active);
+      try {
+        await new Promise(resolve => setImmediate(resolve));
+        if (request.type === 'daily' && request.videoIds.length === 50) {
+          throw Object.assign(Error('PRIVATE_PROVIDER_MESSAGE'), { code: 'pagination' });
+        }
+        if (request.type === 'daily' && request.videoIds.length === 1) retries.push(request.videoIds[0]);
+        return query(request);
+      } finally { active--; }
+    } });
+  assert.equal(retries.length, 150);
+  assert.equal(new Set(retries).size, 150);
+  assert.ok(maximum <= 6);
+  assert.ok(result.videos.every(video => video.daily.status === 'collected'));
+  assert.ok(result.videos.every(video => video.daily.report.rows[0].engagedViews === 10));
+  assert.equal(result.videos[183].daily.report.rows[0].likes, -1);
+  assert.doesNotMatch(JSON.stringify(result), /PRIVATE_PROVIDER_MESSAGE/);
+});
+
+test('an unrecoverable individual daily report keeps safe reason and its original evidence', async () => {
+  const previous = await collectUploadAnalytics({ ...defaults,
+    capturedAt: '2026-10-19T12:00:00Z', query: queryFixture() });
+  const query = queryFixture();
+  const result = await collectUploadAnalytics({ ...defaults, previous, query: async request => {
+    if (request.type === 'daily' && (request.videoIds.length > 1 || request.videoIds[0] === ids[0])) {
+      throw Object.assign(Error('PRIVATE_PROVIDER_MESSAGE token=secret'), { code: 'invalid-response' });
+    }
+    return query(request);
+  } });
+  assert.equal(result.videos[0].daily.status, 'failed-retained');
+  assert.equal(result.videos[0].daily.errorCode, 'invalid-response');
+  assert.equal(result.videos[0].daily.report.capturedAt, previous.capturedAt);
+  assert.ok(result.videos.slice(1).every(video => video.daily.status === 'collected'));
+  assert.doesNotMatch(JSON.stringify(result), /PRIVATE_PROVIDER_MESSAGE|secret/);
+});
+
+test('basic retention survives empty, failed or differently sampled optional segment reports', async () => {
+  const query = queryFixture();
+  for (const mode of ['empty', 'failed', 'other-ratio', 'invalid']) {
+    const result = await collectUploadAnalytics({ ...defaults, query: async request => {
+      if (request.type !== 'retentionSegments') return query(request);
+      if (mode === 'failed') throw Object.assign(Error('PRIVATE_PROVIDER_MESSAGE'), { code: 'http-error' });
+      if (mode === 'empty') return [];
+      return [{ elapsedVideoTimeRatio: mode === 'other-ratio' ? .6 : .5,
+        startedWatching: mode === 'invalid' ? -1 : 1, stoppedWatching: 2, totalSegmentImpressions: 3 }];
+    } });
+    for (const video of result.videos) {
+      assert.equal(video.retention.status, 'collected', mode);
+      const row = video.retention.report.rows[0];
+      assert.equal(row.audienceWatchRatio, 1.2);
+      assert.equal(row.relativeRetentionPerformance, .6);
+      assert.equal(row.startedWatching, null);
+      assert.equal(row.stoppedWatching, null);
+      assert.equal(row.totalSegmentImpressions, null);
+    }
+    assert.deepEqual(validateUploadAnalytics(result), result);
+    const invalid = structuredClone(result);
+    invalid.videos[0].retention.report.rows[0].audienceWatchRatio = null;
+    assert.throws(() => validateUploadAnalytics(invalid), 'only optional segment counts may be null');
+  }
 });
