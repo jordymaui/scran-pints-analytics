@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
 const source = (await readFile(new URL('../sponsor.js', import.meta.url), 'utf8'))
-  .split('const icons =')[0].replace(/^import .*\n/gm, '').replace(/^export /gm, '');
+  .split('const icons =')[0].replace(/^import .*\r?\n/gm, '').replace(/^export /gm, '');
 const context = vm.createContext({ Intl, Date });
 vm.runInContext(source, context);
 const plain = value => JSON.parse(JSON.stringify(value));

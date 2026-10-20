@@ -1,0 +1,197 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildAllSocialAnalytics, combinedAudience } from '../lib/sponsor-aggregate.mjs';
+
+const range = (start, end) => ({ start, end, timezone: null });
+const rows = (days, views) => Array.from({ length: days }, (_, index) => ({
+  date: `2026-10-${String(index + 1).padStart(2, '0')}`,
+  views: typeof views === 'function' ? views(index + 1) : views,
+  likes: 2, comments: 1, shares: 0,
+}));
+const report = () => ({ sources: [
+  { id: 'youtube-longform', status: 'snapshot', metrics: { views: 1000, followers: 50, videoCount: 10 },
+    content: [{ likes: 10, comments: 0, shares: null }],
+    performance: { dateRange: range('2026-10-01', '2026-10-14'), daily: rows(14, day => day) } },
+  { id: 'youtube-shorts', status: 'snapshot', metrics: { views: 999, followers: 50, videoCount: 8 } },
+  { id: 'instagram', status: 'needs-connection' },
+  { id: 'tiktok', status: 'snapshot', metrics: { views: 2000, followers: 20, videoCount: 15,
+    likes: 30, comments: 5, shares: 2 },
+    studioSupplement: { performance: {
+      dateRange: range('2026-10-01', '2026-10-16'),
+      seriesRanges: { overview: range('2026-10-01', '2026-10-15') },
+      daily: [...rows(15, 10), { date: '2026-10-16', views: null, viewers: 500 }],
+    } } },
+] });
+
+test('combined totals count YouTube once, retain public counters and mark unconnected platforms', () => {
+  const input = report();
+  const before = structuredClone(input);
+  const result = buildAllSocialAnalytics(input);
+  assert.deepEqual(result.headlines, { views: 3000, followers: 70, uploads: 25, engagement: 47 });
+  assert.deepEqual(result.coverage.included, ['YouTube', 'TikTok']);
+  assert.deepEqual(result.coverage.missing, ['Instagram']);
+  assert.equal(result.platforms.find(row => row.id === 'instagram').views, null);
+  assert.equal(result.platforms.find(row => row.id === 'instagram').periodComplete, false);
+  assert.equal(result.platforms.length, 3);
+  assert.deepEqual(input, before);
+});
+
+test('7D aligns to the latest shared native overview end and compares the same calendar windows', () => {
+  const result = buildAllSocialAnalytics(report(), '7d');
+  assert.deepEqual(result.performance.dateRange, { start: '2026-10-08', end: '2026-10-14' });
+  assert.equal(result.performance.daily.length, 7);
+  assert.equal(result.performance.totals.views, 147);
+  assert.equal(result.performance.totals.engagement, 42);
+  const comparison = result.performance.comparison.views;
+  assert.equal(comparison.previous.value, 98);
+  assert.equal(comparison.current.value, 147);
+  assert.equal(comparison.percent, 50);
+  assert.equal(comparison.complete, true);
+  assert.deepEqual(result.engagement, { likes: 28, comments: 14, shares: 0, total: 42 });
+});
+
+test('a missing native day remains null, preserves reported contributions and suppresses growth', () => {
+  const input = report();
+  input.sources[0].performance.daily = input.sources[0].performance.daily.filter(row => row.date !== '2026-10-10');
+  const result = buildAllSocialAnalytics(input, '7d');
+  const gap = result.performance.daily.find(row => row.date === '2026-10-10');
+  assert.equal(gap.views, null);
+  assert.equal(gap.byPlatform['youtube-longform'].views, null);
+  assert.equal(gap.byPlatform.tiktok.views, 10);
+  assert.equal(gap.reportedViews, 10);
+  assert.equal(gap.completeViews, false);
+  assert.equal(result.performance.partialDays, 1);
+  assert.equal(result.performance.totals.views, 137);
+  assert.equal(result.performance.comparison.views.percent, null);
+  assert.equal(result.performance.comparison.views.change, null);
+  assert.equal(result.performance.comparison.views.current.days, 6);
+});
+
+test('30D uses its full calendar without claiming a comparison when prior history is incomplete', () => {
+  const result = buildAllSocialAnalytics(report(), '30d');
+  assert.equal(result.performance.daily.length, 30);
+  assert.equal(result.performance.dateRange.start, '2026-09-15');
+  assert.equal(result.performance.totals.views, 245);
+  assert.equal(result.performance.comparison.views.complete, false);
+  assert.equal(result.performance.comparison.views.percent, null);
+});
+
+test('ALL retains both source end dates and sums native activity separately from lifetime counters', () => {
+  const result = buildAllSocialAnalytics(report(), 'all');
+  assert.deepEqual(result.performance.dateRange, { start: '2026-10-01', end: '2026-10-15' });
+  assert.equal(result.performance.daily.length, 15);
+  assert.equal(result.performance.totals.views, 255);
+  assert.equal(result.headlines.views, 3000);
+  assert.equal(result.performance.daily.at(-1).views, null);
+  assert.equal(result.performance.daily.at(-1).reportedViews, 10);
+  assert.equal(result.performance.partialDays, 1);
+  assert.deepEqual(result.performance.comparison, { views: null, engagement: null });
+});
+
+test('known zeroes and signed native engagements survive; a zero growth baseline has no percent', () => {
+  const input = report();
+  for (const source of [input.sources[0].performance, input.sources[3].studioSupplement.performance]) {
+    source.daily = rows(14, day => day <= 7 ? 0 : 10).map(row => ({ ...row, likes: -1, comments: 0, shares: 0 }));
+  }
+  const result = buildAllSocialAnalytics(input, '7d');
+  assert.equal(result.performance.comparison.views.previous.value, 0);
+  assert.equal(result.performance.comparison.views.change, 140);
+  assert.equal(result.performance.comparison.views.percent, null);
+  assert.equal(result.performance.totals.engagement, -14);
+  assert.equal(result.engagement.likes, -14);
+});
+
+test('counters without daily history remain in totals without inventing a chart series', () => {
+  const input = report();
+  input.sources[2] = { id: 'instagram', status: 'snapshot', metrics: { views: 500, followers: 12, videoCount: 3 } };
+  const result = buildAllSocialAnalytics(input, '7d');
+  assert.equal(result.headlines.views, 3500);
+  assert.deepEqual(result.coverage.noDaily, ['Instagram']);
+  assert.deepEqual(result.coverage.chartSources, ['YouTube', 'TikTok']);
+  assert.equal(result.performance.totals.views, 147);
+});
+
+test('unknown engagement fields stay missing even when views are available', () => {
+  const input = report();
+  input.sources[0].performance.daily[13].shares = null;
+  const result = buildAllSocialAnalytics(input, '7d');
+  assert.equal(result.performance.daily.at(-1).views, 24);
+  assert.equal(result.performance.daily.at(-1).engagement, null);
+  assert.equal(result.performance.comparison.engagement.complete, false);
+  assert.equal(result.engagement.shares, 0); // other returned days genuinely report zero shares
+  assert.equal(result.engagement.total, 39);
+  assert.equal(result.engagement.total, result.performance.totals.engagement);
+  assert.equal(result.engagement.likes, 26);
+});
+
+const audienceSources = () => [
+  { id: 'youtube-longform', audience: {
+    demographics: { report: { dateRange: range('2026-10-01', '2026-10-14'), rows: [
+      ...[['age13-17', 30], ['age18-24', 10], ['age25-34', 20], ['age35-44', 20],
+        ['age45-54', 10], ['age55-64', 5], ['age65-', 5]].map(([ageGroup, viewerPercentage]) =>
+        ({ ageGroup, gender: 'male', viewerPercentage })),
+    ] } },
+    country: { report: { dateRange: range('2026-10-01', '2026-10-14'), rows: [
+      { country: 'GB', views: 60 }, { country: 'US', views: 40 },
+    ] } },
+  } },
+  { id: 'tiktok', studioSupplement: { audience: [
+    { population: 'followers', age: [{ label: '18–24', percentage: 99 }],
+      country: [{ label: 'FR', percentage: 100 }], gender: [{ label: 'Male', percentage: 99 }] },
+    { population: 'viewers', dateRange: range('2025-10-01', '2026-10-01'),
+      age: [['18–24', 10], ['25–34', 30], ['35–44', 30], ['45–54', 20], ['55+', 10]]
+        .map(([label, percentage]) => ({ label, percentage })),
+      gender: [{ label: 'Male', percentage: 50 }, { label: 'Female', percentage: 40 }, { label: 'Other', percentage: 10 }],
+      country: [{ label: 'United Kingdom', percentage: 90 }, { label: 'Spain', percentage: null, lessThan: 1 }],
+    },
+  ] } },
+];
+
+test('adult channel profile coarsens 55+, excludes under-18s, then normalises each platform equally', () => {
+  const result = combinedAudience(audienceSources());
+  assert.deepEqual(result.age.contributors, ['YouTube', 'TikTok']);
+  assert.ok(Math.abs(result.age.rows[0].percentage - ((10 / 70 * 100 + 10) / 2)) < 1e-9);
+  assert.ok(Math.abs(result.age.rows.at(-1).percentage - ((10 / 70 * 100 + 10) / 2)) < 1e-9);
+  assert.ok(Math.abs(result.age.rows.reduce((sum, row) => sum + row.percentage, 0) - 100) < 1e-9);
+  assert.equal(result.age.rows.some(row => row.label === '13–17'), false);
+  assert.match(result.age.note, /Under-18s are excluded/);
+});
+
+test('missing adult groups exclude the incomplete profile instead of supplying zero', () => {
+  const input = audienceSources();
+  input[1].studioSupplement.audience[1].age.pop();
+  const result = combinedAudience(input);
+  assert.deepEqual(result.age.contributors, ['YouTube']);
+  assert.ok(Math.abs(result.age.rows[0].percentage - 10 / 70 * 100) < 1e-9);
+});
+
+test('viewer profiles never mix follower populations and retain censored country observations', () => {
+  const result = combinedAudience(audienceSources());
+  const uk = result.country.rows.find(row => row.label === 'United Kingdom');
+  assert.deepEqual(uk.values.map(row => row.percentage), [60, 90]);
+  assert.equal(result.country.rows.some(row => row.label === 'France'), false);
+  const spain = result.country.rows.find(row => row.label === 'Spain').values[0];
+  assert.equal(spain.percentage, null);
+  assert.equal(spain.lessThan, 1);
+  assert.notEqual(uk.values[0].unit, uk.values[1].unit);
+  assert.equal(result.country.method, 'platform-comparison');
+});
+
+test('gender channel means use viewer populations and preserve original rounding', () => {
+  const input = audienceSources();
+  input[0].audience.demographics.report.rows = [
+    { gender: 'male', viewerPercentage: 80 }, { gender: 'female', viewerPercentage: 19.9 },
+    { gender: 'genderUserSpecified', viewerPercentage: 0 },
+  ];
+  const result = combinedAudience(input);
+  assert.deepEqual(result.gender.rows.map(row => row.percentage), [65, 29.95, 5]);
+  assert.deepEqual(result.gender.contributors, ['YouTube', 'TikTok']);
+});
+
+test('empty reports preserve missing totals and unsupported periods are rejected', () => {
+  const result = buildAllSocialAnalytics({ sources: [] }, 'all');
+  assert.deepEqual(result.headlines, { views: null, followers: null, uploads: null, engagement: null });
+  assert.deepEqual(result.performance.daily, []);
+  assert.equal(result.audience.age.rows.every(row => row.percentage === null), true);
+  assert.throws(() => buildAllSocialAnalytics(report(), '90d'), /Unsupported/);
+});
