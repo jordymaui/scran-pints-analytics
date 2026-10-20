@@ -4,10 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <meta name="theme-color" content="#f5f3ed">
+  <meta name="theme-color" content="#fbf0df">
   <title>Studio · Scran &amp; Pints</title>
   <link rel="icon" href="/favicon.png">
   <link rel="stylesheet" href="/workshop.css">
+  <link rel="stylesheet" href="/controls.css">
+  <script type="module" src="/controls.js"></script>
   <script type="module" src="/workshop.js"></script>
 </head>
 <body class="studio">
@@ -23,13 +25,13 @@
     <div class="studio-sidebar-bottom"><a href="/connections.html"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 13 6-6M7 6l2-2a4 4 0 0 1 6 6l-1 1M6 9l-1 1a4 4 0 0 0 6 6l2-2"/></svg>Connections</a><a class="studio-site-link" href="https://scranpints.com" target="_blank" rel="noreferrer">scranpints.com ↗</a></div>
   </aside>
   <div class="studio-app">
-  <header class="studio-header"><div><h1>Studio</h1><span>Private team analytics</span></div><form id="team-sign-out" action="/api/auth/logout" method="post" hidden><button class="text-button" type="submit">Sign out</button></form></header>
+  <header class="studio-header"><div><h1>Studio</h1><span>YouTube analytics</span></div><a id="team-controls-link" class="text-button" href="/login.html?next=%2Fworkshop.html">Team controls ↗</a><form id="team-sign-out" action="/api/auth/logout" method="post" hidden><button class="text-button" type="submit">Sign out</button></form></header>
   <main id="main" class="studio-main">
     <div id="load-state" class="notice" role="status">Loading Studio…</div>
     <div id="workshop-content" hidden>
       <nav class="section-nav" aria-label="Studio sections"><a href="#analytics" data-studio-tab="analytics" aria-current="location">Analytics</a><a href="#compare" data-studio-tab="compare">Compare</a><a href="#packaging" data-studio-tab="packaging">Packaging</a><a href="#metadata" data-studio-tab="metadata">Metadata</a><a href="#notebook" data-studio-tab="notebook">Notebook</a></nav>
       <section id="analytics" data-studio-panel class="work-section analytics-section">
-        <div class="section-heading studio-toolbar"><div><h2>YouTube analytics</h2><p class="source-stamp" id="source-stamp">Opening the saved report…</p></div><a class="button secondary" href="/connections.html">Refresh data ↗</a></div>
+        <div class="section-heading studio-toolbar"><div><h2>YouTube analytics</h2><p class="source-stamp" id="source-stamp">Opening the saved report…</p></div><a class="button secondary" href="/connections.html">Connections ↗</a></div>
         <div id="channel-analytics"></div>
         <div id="shorts-analytics"></div>
         <div class="section-heading analytics-heading"><h3>Episode performance</h3><button id="export-episode-analytics" class="button secondary" type="button">Export metrics ↓</button></div>

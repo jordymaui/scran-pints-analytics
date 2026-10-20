@@ -1,0 +1,24 @@
+.sp-date{display:flex;align-items:center;position:relative;width:174px;max-width:100%;margin-top:5px}
+.sp-date input.sp-date-input{width:100%;min-height:44px;margin:0;padding:10px 43px 10px 12px;font:16px/1.4 var(--brand-body);font-variant-numeric:tabular-nums;color:var(--brand-ink);background:var(--brand-card);border:1px solid var(--brand-line);border-radius:6px}
+.sp-date input.sp-date-input:focus{border-color:var(--brand-red)}
+.sp-date .sp-date-trigger{position:absolute;right:3px;top:3px;width:38px;height:38px;padding:9px;border:0;border-radius:4px;background:transparent;color:var(--brand-muted);cursor:pointer}
+.sp-date-trigger svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5}
+.sp-date .sp-date-trigger:hover,.sp-date .sp-date-trigger[aria-expanded=true]{background:#db0b1910;color:var(--brand-red)}
+.sp-date-popup{position:fixed;z-index:1200;padding:14px;background:var(--brand-card);color:var(--brand-ink);border:1px solid var(--brand-line);border-top:3px solid var(--brand-red);border-radius:8px;box-shadow:0 12px 34px #15131024;overflow:auto;font:15px/1.4 var(--brand-body);box-sizing:border-box}
+.sp-date-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.sp-date-header strong{font:700 17px/1.4 var(--brand-body)}
+.sp-date-popup button{appearance:none;font:inherit;cursor:pointer}
+.sp-date-popup .sp-date-nav{width:36px;height:36px;padding:0;border:1px solid var(--brand-line);border-radius:5px;background:var(--brand-paper);color:var(--brand-ink);font-size:26px;line-height:1}
+.sp-date-weekdays,.sp-date-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;text-align:center}
+.sp-date-weekdays{color:var(--brand-muted);font:13px/1.5 var(--brand-mono);margin-bottom:6px}
+.sp-date-popup .sp-date-day{min-height:36px;padding:5px 0;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--brand-ink);font-size:15px;font-variant-numeric:tabular-nums}
+.sp-date-popup .sp-date-day:hover:not(:disabled),.sp-date-popup .sp-date-nav:hover:not(:disabled){background:var(--brand-paper);border-color:var(--brand-line)}
+.sp-date-popup .sp-date-day[aria-current=date]{border-color:var(--brand-red)}
+.sp-date-popup .sp-date-day[aria-pressed=true]{background:var(--brand-red);color:white;border-color:var(--brand-red);font-weight:700}
+.sp-date-popup button:disabled{opacity:.3;cursor:not-allowed}
+.sp-date-popup button:focus-visible,.sp-date-trigger:focus-visible{outline:2px solid var(--brand-red);outline-offset:2px}
+.sp-date-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--brand-line);margin-top:12px;padding-top:10px;font:12px/1.5 var(--brand-mono);color:var(--brand-muted)}
+.sp-date-popup .sp-date-footer button{border:0;padding:5px;color:var(--brand-red);background:none;font:700 14px var(--brand-body)}
+.custom-dates{align-items:flex-end}
+@media(max-width:540px){.custom-dates{width:100%;gap:12px}.custom-dates>label{flex:1;min-width:145px}.sp-date{width:100%}}
+@media print{.sp-date-popup{display:none}}

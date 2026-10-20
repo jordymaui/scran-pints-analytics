@@ -1,7 +1,8 @@
-import { authorizeRequest, json } from '../lib/auth.mjs';
+import { json } from '../lib/auth.mjs';
 import { loadReportingInputs } from '../lib/cloud-report.mjs';
 import { validateSocialImport } from '../lib/social-schema.mjs';
 import { validateChannelBreakdowns } from '../lib/youtube-breakdowns.mjs';
+import { projectStudioSnapshot } from '../lib/studio-projection.mjs';
 
 const ACTIVITY_FIELDS = ['views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
   'likes', 'comments', 'shares', 'subscribersGained', 'subscribersLost'];
@@ -37,18 +38,17 @@ export function validateChannelAnalytics(report) {
   return structuredClone(report);
 }
 
-export function createWorkshopDataHandler({ authorize = authorizeRequest, loadInputs = loadReportingInputs } = {}) {
+export function createWorkshopDataHandler({ loadInputs = loadReportingInputs } = {}) {
   return async function handler(req, res) {
     if (req.method !== 'GET') {
       res.setHeader('Allow', 'GET');
       return json(res, 405, { error: 'method_not_allowed' });
     }
-    if (!await authorize(req, res)) return;
     try {
-      const { snapshot, social, storageStatus, origins } = await loadInputs();
+      const { snapshot, historicalSnapshot, social, storageStatus, origins } = await loadInputs();
       const shorts = origins['youtube-shorts'] === 'cloud'
         ? social.sources.find(source => source.id === 'youtube-shorts') : null;
-      // Shorts remains private. Never infer an account connection from a bundled import.
+      // Never infer an account connection from a bundled import.
       const shortsAnalytics = shorts
         ? validateSocialImport({ schemaVersion: 1, sources: [shorts] }).sources[0] : null;
       const channelAnalytics = snapshot.channelAnalytics ? validateChannelAnalytics(snapshot.channelAnalytics) : null;
@@ -56,7 +56,10 @@ export function createWorkshopDataHandler({ authorize = authorizeRequest, loadIn
       try {
         if (snapshot.channelBreakdowns) channelBreakdowns = validateChannelBreakdowns(snapshot.channelBreakdowns);
       } catch { /* Optional malformed reports never hide valid core Analytics. */ }
-      return json(res, 200, { ...snapshot, channelAnalytics, channelBreakdowns, shortsAnalytics, storageStatus, snapshotOrigin: origins.youtube });
+      return json(res, 200, projectStudioSnapshot(snapshot, {
+        historicalSnapshot, channelAnalytics, channelBreakdowns, shortsAnalytics,
+        storageStatus, snapshotOrigin: origins.youtube,
+      }));
     } catch { json(res, 503, { error: 'workshop_snapshot_unavailable' }); }
   };
 }

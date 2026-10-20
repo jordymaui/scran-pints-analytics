@@ -9,37 +9,45 @@
   <link rel="icon" href="/favicon.png">
   <link rel="stylesheet" href="/workshop.css">
   <link rel="stylesheet" href="/connections.css">
+  <link rel="stylesheet" href="/controls.css">
   <script type="module" src="/connections.js"></script>
 </head>
-<body>
+<body class="studio">
   <a class="skip-link" href="#main">Skip to connections</a>
-  <div class="edition"><span>SCRAN &amp; PINTS / CONNECTIONS</span><span>PRIVATE TEAM ACCESS</span></div>
-  <header class="site-header">
-    <a href="/" aria-label="Scran and Pints home"><img src="/assets/optimized/3f526c1560f0-480.webp" width="166" height="76" alt="Scran &amp; Pints"></a>
-    <nav aria-label="Main navigation"><a href="/">Public dashboard</a><a href="/sponsor.html">YEET partner view</a><a href="/workshop.html">Workshop</a><a href="/connections.html" aria-current="page">Connections</a></nav>
-  </header>
-  <main id="main">
-    <section class="connection-intro"><div><p class="eyebrow">ACCOUNT CONNECTIONS</p><h1>Connections</h1><p>Connect reporting accounts and refresh saved analytics.</p></div><div class="desk-stamp"><span>REPORTING ACCESS</span><strong>Read-only</strong></div></section>
-    <div id="connection-state" class="notice" role="status">Checking the team’s reporting connections…</div>
+  <aside class="studio-sidebar">
+    <a class="studio-brand" href="/" aria-label="Scran and Pints overview"><img src="/assets/optimized/3f526c1560f0-480.webp" width="146" height="66" alt="Scran &amp; Pints"></a>
+    <nav aria-label="Main navigation">
+      <a href="/"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="5" height="5"/><rect x="12" y="3" width="5" height="5"/><rect x="3" y="12" width="5" height="5"/><rect x="12" y="12" width="5" height="5"/></svg>Overview</a>
+      <a href="/?page=videos"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="4" width="16" height="12" rx="2"/><path d="m8 7 5 3-5 3Z"/></svg>Videos</a>
+      <a href="/workshop.html"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 16h14M5 13V8m5 5V4m5 9v-3"/></svg>Studio</a>
+      <a href="/sponsor.html"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 17V3h12l-3 4 3 4H4"/></svg>YEET</a>
+    </nav>
+    <div class="studio-sidebar-bottom"><a href="/connections.html" aria-current="page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 13 6-6M7 6l2-2a4 4 0 0 1 6 6l-1 1M6 9l-1 1a4 4 0 0 0 6 6l2-2"/></svg>Connections</a><a class="studio-site-link" href="https://scranpints.com" target="_blank" rel="noreferrer">scranpints.com ↗</a></div>
+  </aside>
+  <div class="studio-app">
+  <header class="studio-header"><div><h1>Connections</h1></div><a id="team-controls-link" class="text-button" href="/login.html?next=%2Fconnections.html" aria-label="Sign in to manage reporting connections">Manage ↗</a><form id="team-sign-out" action="/api/auth/logout" method="post" hidden><button class="text-button" type="submit">Sign out</button></form></header>
+  <main id="main" class="studio-main">
+    <section class="connection-intro" aria-label="Reporting connections"><div><p class="eyebrow">REPORTING SOURCES</p><p>See which accounts are connected and when their reports were last collected.</p></div></section>
+    <div id="connection-state" class="notice" role="status">Checking reporting connections…</div>
     <div id="connection-content" hidden>
       <div id="connection-message" class="notice" role="status" hidden></div>
       <div class="connection-toolbar"><p>Connection status is checked from the server. Each report keeps its own collection date.</p><button class="button secondary" id="reload-status" type="button">Check status ↻</button></div>
       <section class="connection-grid" aria-label="Social reporting sources">
         <article class="connection-card" data-source="youtube">
           <div class="connection-card-top"><span class="source-number">01</span><span class="pill" data-field="status">Checking</span></div>
-          <h2>YouTube</h2><p class="connection-subtitle">Public channel / private workshop</p>
-          <p>Public channel and video counters refresh with a server API key. A separate owner connection supplies private watch time, retention, traffic and packaging details for public long-form uploads.</p>
+          <h2>YouTube</h2><p class="connection-subtitle">Channel &amp; episode analytics</p>
+          <p>Channel counters and owner-authorized Analytics supply views, watch time, retention, traffic and video packaging details. Each report shows its own collection date.</p>
           <dl data-field="details"></dl>
           <p class="connection-help" data-field="help"></p>
-          <div class="connection-actions"><form action="/api/connections/youtube?action=start" method="post"><button class="button" id="connect-youtube" type="submit" disabled>Connect YouTube ↗</button></form><button class="button secondary" data-sync="youtube" type="button" disabled>Refresh episodes</button></div>
+          <div class="connection-actions" data-team-control hidden><form action="/api/connections/youtube?action=start" method="post"><button class="button" id="connect-youtube" type="submit" disabled>Connect YouTube ↗</button></form><button class="button secondary" data-sync="youtube" type="button" disabled>Refresh YouTube</button></div>
         </article>
         <article class="connection-card" data-source="youtube-shorts">
           <div class="connection-card-top"><span class="source-number">02</span><span class="pill" data-field="status">Checking</span></div>
-          <h2>YouTube Shorts</h2><p class="connection-subtitle">Private reporting / YouTube Analytics</p>
-          <p>Shorts are included in public channel counters. This separate authorized report stays private, with views and engaged views kept distinct.</p>
+          <h2>YouTube Shorts</h2><p class="connection-subtitle">Short-form / YouTube Analytics</p>
+          <p>Shorts reporting uses the channel owner’s YouTube connection, keeping views and engaged views distinct.</p>
           <dl data-field="details"></dl>
           <p class="connection-help" data-field="help"></p>
-          <div class="connection-actions"><button class="button secondary" data-sync="youtube-shorts" type="button" disabled>Refresh Shorts</button></div>
+          <div class="connection-actions" data-team-control hidden><button class="button secondary" data-sync="youtube-shorts" type="button" disabled>Refresh Shorts</button></div>
         </article>
         <article class="connection-card" data-source="instagram">
           <div class="connection-card-top"><span class="source-number">03</span><span class="pill" data-field="status">Checking</span></div>
@@ -47,7 +55,7 @@
           <p>Instagram reporting needs the correct professional account, a Meta app and approved read access. Availability depends on the account and granted permissions.</p>
           <dl data-field="details"></dl>
           <p class="connection-help" data-field="help"></p>
-          <div class="connection-actions"><button class="button secondary" data-sync="instagram" type="button" disabled>Refresh Instagram</button></div>
+          <div class="connection-actions" data-team-control hidden><button class="button secondary" data-sync="instagram" type="button" disabled>Refresh Instagram</button></div>
         </article>
         <article class="connection-card" data-source="tiktok">
           <div class="connection-card-top"><span class="source-number">04</span><span class="pill" data-field="status">Checking</span></div>
@@ -55,12 +63,13 @@
           <p>Collect permitted video views, likes, comments and shares. Watch time, retention and unique reach are not supplied by the Display API collector.</p>
           <dl data-field="details"></dl>
           <p class="connection-help" data-field="help"></p>
-          <div class="connection-actions"><button class="button secondary" data-sync="tiktok" type="button" disabled>Refresh TikTok</button></div>
+          <div class="connection-actions" data-team-control hidden><button class="button secondary" data-sync="tiktok" type="button" disabled>Refresh TikTok</button></div>
         </article>
       </section>
-      <aside class="reporting-note"><span class="eyebrow">REFRESH DETAILS</span><h3>Report refreshes</h3><p>Reporting runs on the server and saves successful collections to shared storage. A failed refresh keeps the previous evidence. A connection alone does not mean a fresh report has been collected.</p><p>YouTube consent requests read-only Data and Analytics access for Scran &amp; Pints. Google sign-in and the reporting connection are separate permissions.</p><a href="/workshop.html">Open Studio ↗</a></aside>
+      <aside class="reporting-note"><span class="eyebrow">REFRESH DETAILS</span><h3>Report refreshes</h3><p>Reporting runs on the server and saves successful collections. A failed refresh keeps the previous evidence. A connection alone does not mean a fresh report has been collected.</p><p>The team manages account connections and report refreshes. Saved analytics and connection status are viewable without signing in.</p><a href="/workshop.html">Open Studio ↗</a></aside>
     </div>
     <footer><img src="/assets/optimized/3f526c1560f0-480.webp" alt="Scran &amp; Pints"><p>Scran &amp; Pints Analytics</p><nav aria-label="Information"><a href="/privacy.html">Privacy</a> · <a href="/terms.html">Usage notice</a> · <a href="#main">Back to top ↑</a></nav></footer>
   </main>
+  </div>
 </body>
 </html>

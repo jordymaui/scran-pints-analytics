@@ -80,17 +80,17 @@ function response() {
     end(body) { this.body = JSON.parse(body); } };
 }
 
-test('workshop authorization precedes any read of channel or Shorts Analytics', async () => {
+test('Studio GET is public but stored unknown fields never enter its response', async () => {
   let reads = 0;
   const handler = createWorkshopDataHandler({
     authorize: async (_req, res) => { res.statusCode = 401; res.end('{"error":"authentication_required"}'); return false; },
-    loadInputs: async () => { reads++; throw Error('Private reports must not be read'); },
+    loadInputs: async () => { reads++; return { snapshot: { privateEvidence: 'PRIVATE_EVIDENCE' }, social: { sources: [] }, origins: {} }; },
   });
   const res = response();
   await handler({ method: 'GET' }, res);
-  assert.equal(res.statusCode, 401);
-  assert.equal(reads, 0);
-  assert.doesNotMatch(JSON.stringify(res.body), privatePattern);
+  assert.equal(res.statusCode, 200);
+  assert.equal(reads, 1);
+  assert.doesNotMatch(JSON.stringify(res.body), /PRIVATE_EVIDENCE/);
 });
 
 test('authorized workshop retains native channel and Shorts values with their independent source dates', async () => {

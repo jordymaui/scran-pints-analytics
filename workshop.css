@@ -16,7 +16,7 @@
 .api-refresh{border-bottom:1px dashed var(--line);margin-bottom:22px;padding-bottom:10px}.api-refresh .pill{border-color:var(--red);color:var(--red)}
 .channel-breakdowns label{width:min(290px,100%)}.channel-breakdowns select{width:100%}.breakdown-table{max-height:420px;overflow:auto}.breakdown-table th,.breakdown-table td{padding:13px;font-size:12px}.breakdown-table th:first-child,.breakdown-table td:first-child{min-width:170px}.breakdown-table td{overflow-wrap:anywhere}
 .text-links{flex-wrap:wrap}.notebook-note>span{display:block;margin-top:8px;font:10px/1.8 var(--mono)}.notebook-note .text-button{margin:8px 15px 0 0}.button:disabled,.text-button:disabled{opacity:.5;cursor:not-allowed}
-.analytics-section{margin-top:32px}.analytics-report{border:1px solid var(--line);background:var(--cream);padding:24px;margin:20px 0}.analytics-report>.note{max-width:1100px}.analytics-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:22px 0}.analytics-metrics>div{background:var(--cream);padding:17px 14px;min-width:0}.analytics-metrics dt{font:10px/1.7 var(--mono);color:var(--muted)}.analytics-metrics dd{font:600 28px/1.35 Oswald,sans-serif;margin:7px 0 0;overflow-wrap:anywhere}.analytics-trend{margin:20px 0 0;background:var(--cream);border:1px solid var(--line);padding:20px}.analytics-trend svg{display:block;width:100%;height:auto}.analytics-trend label{min-width:155px}.analytics-trend h4{margin:0}.analytics-trend text{fill:var(--muted);font:11px var(--mono)}.analytics-daily summary{font:11px/1.8 var(--mono);padding:10px 0}.analytics-daily .table-scroll{margin-top:10px;max-height:450px;overflow:auto}.analytics-daily th,.analytics-daily td{white-space:nowrap;font-size:11px;padding:12px}.analytics-daily th:first-child,.analytics-daily td:first-child{min-width:120px}.analytics-heading{margin:32px 0 16px}.analytics-controls{margin-bottom:18px}.analytics-controls .search-label{flex:1;max-width:560px}.analytics-table th,.analytics-table td{padding:16px 13px;font-size:12px}.analytics-table th[scope="row"]{min-width:280px;max-width:390px;text-align:left;white-space:normal;font:12px/1.7 Arial,Helvetica,sans-serif}.analytics-table th[scope="row"] small{display:block;color:var(--muted);font:10px/1.8 var(--mono);margin-top:5px}.analytics-table td{white-space:nowrap}.analytics-video-label{width:min(500px,100%)}.analytics-video-label select{width:100%}
+.analytics-section{margin-top:32px}.analytics-report{border:1px solid var(--line);background:var(--cream);padding:24px;margin:20px 0}.analytics-report>.note{max-width:1100px}.analytics-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:22px 0}.analytics-metrics>div{background:var(--cream);padding:17px 14px;min-width:0}.analytics-metrics dt{font:10px/1.7 var(--mono);color:var(--muted)}.analytics-metrics dd{font:600 28px/1.35 Oswald,sans-serif;margin:7px 0 0;overflow-wrap:anywhere}.analytics-trend{margin:20px 0 0;background:var(--cream);border:1px solid var(--line);padding:20px}.analytics-trend > svg{display:block;width:100%;height:auto}.analytics-trend label{min-width:155px}.analytics-trend h4{margin:0}.analytics-trend text{fill:var(--muted);font:11px var(--mono)}.analytics-daily summary{font:11px/1.8 var(--mono);padding:10px 0}.analytics-daily .table-scroll{margin-top:10px;max-height:450px;overflow:auto}.analytics-daily th,.analytics-daily td{white-space:nowrap;font-size:11px;padding:12px}.analytics-daily th:first-child,.analytics-daily td:first-child{min-width:120px}.analytics-heading{margin:32px 0 16px}.analytics-controls{margin-bottom:18px}.analytics-controls .search-label{flex:1;max-width:560px}.analytics-table th,.analytics-table td{padding:16px 13px;font-size:12px}.analytics-table th[scope="row"]{min-width:280px;max-width:390px;text-align:left;white-space:normal;font:12px/1.7 Arial,Helvetica,sans-serif}.analytics-table th[scope="row"] small{display:block;color:var(--muted);font:10px/1.8 var(--mono);margin-top:5px}.analytics-table td{white-space:nowrap}.analytics-video-label{width:min(500px,100%)}.analytics-video-label select{width:100%}
 @media(max-width:1020px){.analytics-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.analytics-metrics dd{font-size:26px}}
 @media(max-width:760px){.analytics-report{padding:17px 13px}.analytics-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.analytics-metrics>div{padding:14px 11px}.analytics-metrics dt{font-size:9px}.analytics-metrics dd{font-size:25px}.analytics-trend{padding:15px 10px}.analytics-trend .section-heading{align-items:start}.analytics-trend label{width:100%}.analytics-trend text{font-size:12px}.analytics-controls .search-label{max-width:none;width:100%;flex-basis:100%}.analytics-daily th:first-child,.analytics-daily td:first-child{min-width:120px}.section-nav a:nth-child(n){border-bottom:1px solid var(--ink)}.section-nav a:nth-child(even){border-right:0}.section-nav a:last-child{grid-column:1/-1;border:0}}
 @media print{body{background:white}.site-header nav,.section-nav,.controls,.button,.text-links,.experiment-form,.draft-actions,.workshop-ticket,#load-state{display:none}.hero{padding:20px 0;display:block}h1{font-size:45px}.summary-strip{margin:20px 0}.table-scroll{overflow:visible}th,td{padding:8px;font-size:9px!important}td:first-child{min-width:0!important}.episode-row img{display:none}.video-card,.pair-card,.saved-experiment{break-inside:avoid}.pair-grid{grid-template-columns:repeat(3,1fr)}.notebook-layout{display:block}}
@@ -114,7 +114,7 @@ body.studio {
 .studio .analytics-trend .section-heading {margin-bottom:13px;min-height:30px}
 .studio .analytics-trend label {display:flex;align-items:center;gap:9px;min-width:0}
 .studio .analytics-trend select {width:215px;font-size:16px}
-.studio .analytics-trend svg {min-height:280px;max-height:390px;overflow:visible}
+.studio .analytics-trend > svg {min-height:280px;max-height:390px;overflow:visible}
 .studio .analytics-trend text {fill:var(--muted);font:13px var(--brand-body,Arial,Helvetica,sans-serif)}
 .studio .analytics-trend line,.studio #retention-chart line {stroke:var(--line)}
 .studio .analytics-trend polyline,.studio #retention-chart polyline:first-of-type {stroke:var(--red)}
@@ -160,7 +160,8 @@ body.studio {
 .studio .video-card {padding:18px}
 .studio .video-card-head p {font:500 16px/1.55 var(--brand-body,Arial,Helvetica,sans-serif)}
 .studio .video-card dt {font:13px/1.55 var(--brand-body,Arial,Helvetica,sans-serif)}
-.studio .video-card dd {font:600 32px/1.3 var(--brand-body,Arial,Helvetica,sans-serif);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.studio .video-card dl {grid-template-columns:repeat(auto-fit,minmax(125px,1fr))}
+.studio .video-card dd {font:600 32px/1.3 var(--brand-body,Arial,Helvetica,sans-serif);font-variant-numeric:tabular-nums;white-space:nowrap}
 .studio .chart-panel:not(.analytics-trend) {padding:20px;margin-top:20px}
 .studio .chart-panel h3 {font-size:20px}
 .studio .chart-panel text {font-family:var(--brand-body,Arial,Helvetica,sans-serif);font-size:13px}
@@ -196,7 +197,7 @@ body.studio {
 .studio footer {padding:20px 0;font-size:13px;color:var(--muted);border-color:var(--line)}
 .studio footer a {font-size:14px}
 @media(min-width:1600px) {
-  .studio .analytics-trend svg {min-height:330px}
+  .studio .analytics-trend > svg {min-height:330px}
 }
 @media(max-width:1350px) {
   .studio-sidebar {width:200px}
@@ -245,7 +246,7 @@ body.studio {
   .studio .analytics-metrics dd {font-size:32px;letter-spacing:-.5px}
   .studio .report-details .analytics-metrics {grid-template-columns:repeat(2,minmax(0,1fr))}
   .studio .report-details .analytics-metrics>div:nth-child(n) {padding:10px;border:0}
-  .studio .analytics-trend svg {min-height:190px}
+  .studio .analytics-trend > svg {min-height:190px}
   .studio .analytics-trend label {width:100%;justify-content:space-between;flex-wrap:wrap}
   .studio .analytics-trend select {width:min(215px,100%);max-width:100%}
   .studio .channel-breakdowns label {width:100%}
@@ -277,3 +278,5 @@ body.studio {
   .studio [data-studio-panel][hidden] {display:block!important}
   .studio .analytics-report,.studio .video-card {break-inside:avoid}
 }
+
+body.studio:not(.team-access) :is([data-studio-tab="notebook"],#notebook,#start-pair-experiment,[data-draft-test]){display:none!important}

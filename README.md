@@ -13,8 +13,9 @@ The public API projects approved fields from saved cloud reports. If storage is 
 | `/` | Public overview and advanced platform reporting |
 | `/sponsor.html` | Public YEET report; confirmed campaign placements are separate from channel context |
 | `/api/report` | Public, allowlisted reporting JSON |
-| `/workshop.html`, `/connections.html` | Team workspace shells; data and actions require approved Google sign-in |
-| `/api/workshop-data`, `/api/workshop-notebook`, `/api/connection-status` | Authenticated workshop data, shared notes and connection status |
+| `/workshop.html`, `/connections.html` | Public Studio reports and connection status; management actions require approved team sign-in |
+| `/api/workshop-data`, `/api/connection-status` | Public, explicitly projected Studio reports and sanitized connection status |
+| `/api/workshop-notebook` | Authenticated shared notebook; unpublished notes remain private |
 | `/api/connections/youtube` | Team-authorized, read-only YouTube reporting consent |
 | `/api/sync?source=…` | Authenticated same-origin manual refresh; cron requires its server secret |
 | `/review-room.html` and legacy research pages | Authenticated historical review tools and evidence |
@@ -38,11 +39,11 @@ The public API projects approved fields from saved cloud reports. If storage is 
 
 3. Keep the shared Supabase project's existing main-site URL and redirect entries. Add this app's `/api/auth/callback**` redirect entry. Configure Google's reporting callback exactly as documented in [YouTube setup](docs/YOUTUBE.md), including `?action=callback`.
 4. Deploy the verified GitHub revision to the existing Vercel project. [`vercel.json`](vercel.json) selects `npm run build`, publishes only `public-dist`, bundles protected files inside server functions, and schedules four daily refresh jobs at 04:00–07:00 UTC.
-5. Verify public reporting, unauthenticated access denial, approved team sign-in, shared notebook saves, and a real reporting connection. Use Connections to refresh public YouTube counters with the restricted key. Separately authorize read-only YouTube Analytics for private episode reports and refresh private Shorts reports. A configured schedule or consent screen alone does not establish successful collection.
+5. Verify anonymous dashboard, Studio and Connections viewing, denied anonymous management actions, approved team sign-in, shared notebook saves, and a real reporting connection. Use Connections to refresh public YouTube counters with the restricted key. Separately authorize read-only YouTube Analytics for episode reports and refresh Shorts reports. A configured schedule or consent screen alone does not establish successful collection.
 
 ## Coverage and limitations
 
-The bundled YouTube archive covers five selected full episodes. Private Workshop refreshes discover the channel's public uploads and add full episodes verified by Analytics content type while preserving that archive. Unknown formats, publications after the reporting cutoff and uploads awaiting report data remain visible coverage gaps. Public YouTube reporting uses a separate Data API collection; authorised Analytics reports stay in the private Workshop. Shorts has a separate private adapter; Instagram reporting remains blocked pending professional-account/app setup and a verified adapter. TikTok's implemented Display adapter supplies lifetime counters; detailed watch-time and account insights need separate product approval and implementation. See [YouTube discovery and limits](docs/YOUTUBE.md) and [connection capabilities and setup](docs/CONNECTIONS.md).
+The bundled YouTube archive covers five selected full episodes. Team-authorized Studio refreshes discover the channel's public uploads and add full episodes verified by Analytics content type while preserving that archive. Unknown formats, publications after the reporting cutoff and uploads awaiting report data remain visible coverage gaps. Public YouTube reporting uses a separate Data API collection; authorised Analytics reports are projected for public Studio viewing. Shorts has a separate reporting adapter; Instagram reporting remains blocked pending professional-account/app setup and a verified adapter. TikTok's implemented Display adapter supplies lifetime counters; detailed watch-time and account insights need separate product approval and implementation. See [YouTube discovery and limits](docs/YOUTUBE.md) and [connection capabilities and setup](docs/CONNECTIONS.md).
 
 Missing metrics remain unavailable. Cross-platform views are not unique people. YEET exposure or return on investment requires confirmed attribution. Native test watch-time shares are distinct from whole-video CTR, and combined title/thumbnail experiments support conclusions about the pairing. The workshop preserves dates and evidence; its collectors do not change YouTube publishing or packaging.
 

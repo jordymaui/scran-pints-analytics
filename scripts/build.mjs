@@ -4,12 +4,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildPublicReport, publicYouTubeThumbnail } from '../lib/report-model.mjs';
 import { validateSocialImport } from '../lib/social-schema.mjs';
 import { validateCampaigns } from '../lib/campaign-schema.mjs';
+import { studioThumbnailAssets } from '../lib/studio-projection.mjs';
 export { validateCampaigns } from '../lib/campaign-schema.mjs';
 
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const PUBLIC_OUTPUT = resolve(ROOT, 'public-dist');
 export const PUBLIC_FILES = Object.freeze([
   'index.html', 'sponsor.html', 'dashboard.js', 'dashboard.css', 'brand-tokens.css',
+  'controls.js', 'controls.css', 'date-picker.js', 'date-picker.css',
   'workshop.html', 'workshop.js', 'workshop.css',
   'login.html', 'login.js', 'login.css', 'favicon.png',
   'connections.html', 'connections.js', 'connections.css',
@@ -38,6 +40,7 @@ export async function buildPublicOutput() {
   const campaigns = validateCampaigns(campaignsRaw, snapshot, social);
   const report = buildPublicReport(snapshot, social, campaigns, { allowHistoricalYouTube: true });
   const files = new Set(PUBLIC_FILES);
+  for (const asset of studioThumbnailAssets(snapshot)) files.add(asset);
   for (const video of snapshot.videos) {
     if (video.thumb == null && video.discoveredAt) continue;
     if (!publicYouTubeThumbnail(video.thumb)) throw new Error('Public thumbnail must be a saved episode image or official YouTube image URL.');

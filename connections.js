@@ -1,6 +1,6 @@
 const $ = selector => document.querySelector(selector);
 const sourceIds = ['youtube', 'youtube-shorts', 'instagram', 'tiktok'];
-const sourceNames = { youtube: 'YouTube', 'youtube-shorts': 'Private YouTube Shorts', instagram: 'Instagram', tiktok: 'TikTok' };
+const sourceNames = { youtube: 'YouTube', 'youtube-shorts': 'YouTube Shorts', instagram: 'Instagram', tiktok: 'TikTok' };
 const errors = {
   youtube_not_configured: 'YouTube reporting is not configured on the server yet. The Google app credentials need to be added before connecting.',
   storage_not_configured: 'Shared reporting storage is not configured yet.',
@@ -23,6 +23,25 @@ const formatDate = value => {
 let current = null;
 let busySource = null;
 let statusPending = false;
+let teamAccess = false;
+
+function setTeamAccess(allowed) {
+  teamAccess = allowed === true;
+  document.querySelectorAll('[data-team-control]').forEach(element => { element.hidden = !teamAccess; });
+  $('#team-controls-link').hidden = teamAccess;
+  $('#team-sign-out').hidden = !teamAccess;
+  if (current) renderStatus();
+}
+
+async function loadTeamAccess() {
+  try {
+    const response = await fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' });
+    const result = response.ok ? await response.json() : null;
+    setTeamAccess(response.ok && result?.authenticated === true);
+  } catch {
+    setTeamAccess(false);
+  }
+}
 
 function message(text, success = false) {
   $('#connection-message').hidden = false;
@@ -37,30 +56,31 @@ function renderStatus() {
     const status = card.querySelector('[data-field="status"]');
     const connected = platform.connected === true;
     const publicReady = source === 'youtube' && current.setup?.youtubePublic === true;
-    status.textContent = connected ? 'Connected' : publicReady ? 'Public counters ready' : 'Setup needed';
-    status.className = `pill ${connected || publicReady ? 'connected' : 'pending'}`;
+    const verified = current.configured === true;
+    status.textContent = !verified ? 'Status unavailable' : connected ? 'Connected' : publicReady ? 'Public counters ready' : 'Setup needed';
+    status.className = `pill ${verified && (connected || publicReady) ? 'connected' : 'pending'}`;
     const lastSync = platform.lastSync;
     const syncLabel = !lastSync ? 'No run recorded' : lastSync.status === 'ready' ? lastSync.errorCode === 'partial_refresh' ? 'Partly completed · previous capture kept' : 'Completed' :
       { failed: 'Failed · previous data kept', blocked: 'Setup blocked', busy: 'Already running', 'not-connected': 'Not connected' }[lastSync.status] || 'Needs attention';
     card.querySelector('[data-field="details"]').innerHTML = [
-      ['Private reporting grant', connected ? `Saved ${formatDate(platform.connectedAt)}` : 'No reporting grant saved'],
+      ['Reporting connection', !verified ? 'Could not be checked' : connected ? `Saved ${formatDate(platform.connectedAt)}` : 'Not connected'],
       ...(source === 'youtube' ? [['Public counters', publicReady ? 'Public API configured' : 'Public API key needed']] : []),
-      ['Latest saved collection', platform.hasSnapshot ? formatDate(platform.capturedAt) : 'No cloud collection yet'],
-      ['Last refresh', `${syncLabel}${lastSync?.completedAt ? ` · ${formatDate(lastSync.completedAt)}` : ''}`],
+      ['Latest saved collection', !verified ? 'Could not be checked' : platform.hasSnapshot ? formatDate(platform.capturedAt) : 'No cloud collection yet'],
+      ['Last refresh', !verified ? 'Could not be checked' : `${syncLabel}${lastSync?.completedAt ? ` · ${formatDate(lastSync.completedAt)}` : ''}`],
     ].map(([label, value]) => `<div><dt>${escapeHTML(label)}</dt><dd>${escapeHTML(value)}</dd></div>`).join('');
     let help;
-    if (source === 'youtube') help = `${publicReady ? 'Public channel counters can refresh now without account consent. ' : 'The public API key is not configured. '} ${connected ? 'The same refresh also updates the private long-form workshop. Each report keeps its own capture date.' : 'Connect the owning Google account to enable private watch-time, retention and long-form reports.'}`;
-    if (source === 'youtube-shorts') help = 'Shorts are included in the public channel counters; a separate public breakdown is unavailable. This button collects an authorized private Shorts report using the YouTube grant.';
+    if (source === 'youtube') help = connected ? 'The channel owner has connected YouTube Analytics. Channel, episode and packaging reports keep their own source dates.' : publicReady ? 'Public channel counters are available. An owner connection is needed for watch time, retention and other YouTube Analytics reports.' : 'YouTube reporting has not been configured yet.';
+    if (source === 'youtube-shorts') help = connected ? 'Shorts reporting uses the channel’s YouTube connection. Views and engaged views are reported separately.' : 'A YouTube owner connection is needed to collect a separate Shorts Analytics report.';
     if (source === 'instagram') help = connected ? 'A reporting grant is stored. Refresh availability still depends on the connected account and the Instagram integration.' : 'Meta app and professional-account reporting access still need setup. No Instagram connection has been recorded.';
     if (source === 'tiktok') help = connected ? 'A reporting grant is stored. A refresh collects the counters the connected app is allowed to read.' : 'A TikTok developer app, approved scopes and account authorisation still need setup. No TikTok connection has been recorded.';
-    card.querySelector('[data-field="help"]').textContent = help;
+    card.querySelector('[data-field="help"]').textContent = verified ? help : 'Connection status could not be verified. Previously collected reports remain available.';
     const button = card.querySelector('[data-sync]');
-    button.disabled = (!connected && !publicReady) || !!busySource || statusPending;
+    button.disabled = !teamAccess || !verified || (!connected && !publicReady) || !!busySource || statusPending;
     button.textContent = busySource === source ? 'Collecting report…' : {
-      youtube: 'Refresh YouTube', 'youtube-shorts': 'Refresh private Shorts', instagram: 'Refresh Instagram', tiktok: 'Refresh TikTok',
+      youtube: 'Refresh YouTube', 'youtube-shorts': 'Refresh Shorts', instagram: 'Refresh Instagram', tiktok: 'Refresh TikTok',
     }[source];
   }
-  $('#connect-youtube').disabled = !current.configured || !current.setup?.youtubeOAuth || !!busySource || statusPending;
+  $('#connect-youtube').disabled = !teamAccess || !current.configured || !current.setup?.youtubeOAuth || !!busySource || statusPending;
   $('#connect-youtube').textContent = platforms.get('youtube')?.connected ? 'Reconnect YouTube ↗' : 'Connect YouTube ↗';
   $('#reload-status').disabled = !!busySource || statusPending;
 }
@@ -71,15 +91,8 @@ async function loadStatus({ showCallback = false } = {}) {
   if (current) renderStatus();
   try {
     const response = await fetch('/api/connection-status', { credentials: 'same-origin', cache: 'no-store' });
-    if (response.status === 401 || response.status === 403) {
-      current = null;
-      $('#connection-content').hidden = true;
-      $('#connection-state').hidden = false;
-      $('#connection-state').innerHTML = '<strong>The reporting desk is for the team.</strong><p>Sign in with an authorised team account to view connections and collect reports.</p><a class="button" href="/login.html">Sign in with Google ↗</a>';
-      return;
-    }
     const result = await response.json();
-    if (!response.ok || result.configured !== true || !Array.isArray(result.platforms)) throw Error('unavailable');
+    if (!response.ok || typeof result.configured !== 'boolean' || !Array.isArray(result.platforms)) throw Error('unavailable');
     current = result;
     $('#connection-state').hidden = true;
     $('#connection-content').hidden = false;
@@ -88,7 +101,7 @@ async function loadStatus({ showCallback = false } = {}) {
       const error = params.get('error');
       if (error) message(errors[error] || 'The connection could not complete. Start a new connection attempt.');
       else if (params.get('connected') === 'youtube' && result.platforms.some(p => p.id === 'youtube' && p.connected === true)) {
-        message('The Scran & Pints YouTube reporting connection is saved. Refresh episodes or Shorts to collect the latest available reports.', true);
+        message('The Scran & Pints YouTube reporting connection is saved. YouTube and Shorts reports can now be refreshed.', true);
       }
       if (error || params.has('connected')) history.replaceState(null, '', '/connections.html');
     }
@@ -96,7 +109,7 @@ async function loadStatus({ showCallback = false } = {}) {
     if (current) message('Connection status could not be refreshed. Check again before starting a collection.');
     else {
       $('#connection-state').hidden = false;
-      $('#connection-state').innerHTML = '<strong>The reporting desk is not ready yet.</strong><p>Team authentication and shared reporting storage must be configured on the server. No connection status could be verified.</p><button class="button secondary" id="retry-connections" type="button">Try again</button>';
+      $('#connection-state').innerHTML = '<strong>Connection status is unavailable.</strong><p>The reporting service could not be reached. Saved analytics remain available from the dashboard and Studio.</p><button class="button secondary" id="retry-connections" type="button">Try again</button>';
       $('#retry-connections').addEventListener('click', () => loadStatus({ showCallback: true }));
     }
   } finally {
@@ -106,7 +119,7 @@ async function loadStatus({ showCallback = false } = {}) {
 }
 
 async function sync(source) {
-  if (!sourceIds.includes(source) || busySource || !(current?.platforms.some(p => p.id === source && p.connected === true) ||
+  if (!teamAccess || !current?.configured || statusPending || !sourceIds.includes(source) || busySource || !(current?.platforms.some(p => p.id === source && p.connected === true) ||
       source === 'youtube' && current?.setup?.youtubePublic === true)) return;
   busySource = source;
   renderStatus();
@@ -114,12 +127,13 @@ async function sync(source) {
   try {
     const response = await fetch(`/api/sync?source=${encodeURIComponent(source)}`, { method: 'POST', credentials: 'same-origin', cache: 'no-store' });
     if (response.status === 401 || response.status === 403) {
-      message('Your team session needs sign-in again. The saved report is unchanged.');
+      setTeamAccess(false);
+      message('Team controls have signed out. The saved report is unchanged.');
       return;
     }
     const result = await response.json();
     if (response.ok && result.status === 'ready') {
-      const parts = result.components ? ` Public counters: ${result.components.public.status}. Private Analytics: ${result.components.analytics.status}.` : '';
+      const parts = result.components ? ` Public counters: ${result.components.public.status}. YouTube Analytics: ${result.components.analytics.status}.` : '';
       message(`${sourceNames[source]} collection saved.${parts} Open the dashboard or workshop to inspect each report's capture date.`, true);
     } else {
       const text = {
@@ -139,4 +153,8 @@ async function sync(source) {
 }
 $('#reload-status').addEventListener('click', () => loadStatus());
 document.querySelectorAll('[data-sync]').forEach(button => button.addEventListener('click', () => sync(button.dataset.sync)));
+$('#connect-youtube').form.addEventListener('submit', event => {
+  if (!teamAccess || $('#connect-youtube').disabled) event.preventDefault();
+});
 loadStatus({ showCallback: true });
+loadTeamAccess();

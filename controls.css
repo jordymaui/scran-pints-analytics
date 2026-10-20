@@ -1,0 +1,533 @@
+@import url('/brand-tokens.css');
+
+/* Shared form controls. Navigation, chart metrics and segmented controls
+   retain their existing component styles. Date pickers use separate sp-date*. */
+:root {
+  --control-radius: 7px;
+  --control-hover: #f7e6d1;
+  --control-selected: #fbe1d8;
+  --control-focus: #db0b1933;
+}
+
+body :is(input:not([type]), input[type="text"], input[type="search"],
+  input[type="email"], input[type="url"], input[type="tel"], input[type="password"],
+  input[type="number"], textarea),
+body select:not(.sp-select-native) {
+  min-block-size: 44px;
+  max-inline-size: 100%;
+  box-sizing: border-box;
+  padding: 10px 13px;
+  border: 1px solid var(--brand-line);
+  border-radius: var(--control-radius);
+  background-color: var(--brand-card);
+  color: var(--brand-ink);
+  font: 400 16px/1.5 var(--brand-body);
+  box-shadow: 0 1px 2px #15131005;
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+body textarea {
+  min-block-size: 96px;
+  resize: vertical;
+}
+body :is(input, textarea)::placeholder {
+  color: var(--brand-muted);
+  opacity: 1;
+}
+body :is(input:not([type]), input[type="text"], input[type="search"],
+  input[type="email"], input[type="url"], input[type="tel"], input[type="password"],
+  input[type="number"], textarea):hover:not(:disabled):not(:read-only),
+body select:not(.sp-select-native):hover:not(:disabled) {
+  border-color: var(--brand-muted);
+}
+body :is(input:not([type]), input[type="text"], input[type="search"],
+  input[type="email"], input[type="url"], input[type="tel"], input[type="password"],
+  input[type="number"], textarea):focus-visible,
+body select:not(.sp-select-native):focus-visible {
+  border-color: var(--brand-red);
+  outline: 2px solid var(--brand-red);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--control-focus);
+}
+body :is(input:not([type]), input[type="text"], input[type="search"],
+  input[type="email"], input[type="url"], input[type="tel"], input[type="password"],
+  input[type="number"], textarea):disabled,
+body select:not(.sp-select-native):disabled {
+  background-color: var(--brand-paper);
+  color: var(--brand-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+body :is(input, textarea)[aria-invalid="true"] {
+  border-color: var(--brand-red);
+}
+body input[type="search"] {
+  appearance: none;
+  padding-inline-start: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23686158' stroke-width='1.7' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='m16 16 4.5 4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 13px center;
+  background-size: 20px;
+}
+body input[type="search"]::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+body select:not(.sp-select-native):not([multiple]) {
+  appearance: none;
+  padding-inline-end: 42px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23151310' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 18px;
+}
+
+/* The original select remains the form value. Its button and portalled
+   listbox provide the visible control; controls.js manages all ARIA states. */
+.sp-select {
+  position: relative;
+  display: inline-flex;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  vertical-align: middle;
+}
+body select.sp-select-native {
+  position: absolute !important;
+  inline-size: 1px !important;
+  block-size: 1px !important;
+  min-inline-size: 0 !important;
+  min-block-size: 0 !important;
+  max-inline-size: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+}
+body .sp-select-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  margin: 0;
+  padding: 10px 13px;
+  border: 1px solid var(--brand-line);
+  border-radius: var(--control-radius);
+  background: var(--brand-card);
+  color: var(--brand-ink);
+  box-shadow: 0 1px 2px #15131005;
+  font: 400 16px/1.5 var(--brand-body);
+  text-align: start;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+.sp-select-value {
+  display: block;
+  inline-size: auto;
+  block-size: auto;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sp-select-value.is-placeholder {
+  color: var(--brand-muted);
+}
+.sp-select-chevron {
+  display: inline-flex;
+  flex: 0 0 18px;
+  inline-size: 18px;
+  block-size: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--brand-muted);
+  transition: transform 120ms ease;
+}
+.sp-select-chevron svg {
+  inline-size: 100%;
+  block-size: 100%;
+}
+body .sp-select-button:hover:not(:disabled) {
+  border-color: var(--brand-muted);
+  background: var(--brand-paper);
+}
+body .sp-select-button:focus-visible {
+  outline: 2px solid var(--brand-red);
+  outline-offset: 2px;
+  border-color: var(--brand-red);
+  box-shadow: 0 0 0 4px var(--control-focus);
+}
+body .sp-select.is-open .sp-select-button {
+  border-color: var(--brand-red);
+  background: var(--brand-card);
+}
+.sp-select.is-open .sp-select-chevron {
+  color: var(--brand-red);
+  transform: rotate(180deg);
+}
+body .sp-select.is-disabled .sp-select-button,
+body .sp-select-button:disabled {
+  background: var(--brand-paper);
+  color: var(--brand-muted);
+  border-color: var(--brand-line);
+  box-shadow: none;
+  opacity: 1;
+  cursor: not-allowed;
+}
+.sp-select-popup {
+  box-sizing: border-box;
+  max-inline-size: calc(100vw - 24px);
+  border: 1px solid var(--brand-line);
+  border-radius: 9px;
+  background: var(--brand-card);
+  color: var(--brand-ink);
+  box-shadow: 0 12px 32px #15131024, 0 2px 6px #15131010;
+  padding: 5px;
+  font: 400 16px/1.5 var(--brand-body);
+}
+.sp-select-popup:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+.sp-select-listbox {
+  flex: 1 1 auto;
+  min-block-size: 0;
+  max-block-size: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--brand-line) var(--brand-card);
+  outline: none;
+}
+.sp-select-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-block-size: 44px;
+  box-sizing: border-box;
+  padding: 10px 39px 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--brand-ink);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.sp-select-option + .sp-select-option {
+  margin-block-start: 2px;
+}
+.sp-select-option.is-selected,
+.sp-select-option[aria-selected="true"] {
+  background: var(--control-selected);
+  font-weight: 700;
+}
+.sp-select-option.is-selected::after,
+.sp-select-option[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: 15px;
+  inline-size: 7px;
+  block-size: 12px;
+  border: solid var(--brand-red);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-2px) rotate(45deg);
+}
+.sp-select-option:hover:not(.is-disabled):not([aria-disabled="true"]),
+.sp-select-option.is-active:not(.is-disabled):not([aria-disabled="true"]) {
+  border-color: var(--brand-red);
+  background: var(--control-hover);
+}
+.sp-select-option.is-disabled,
+.sp-select-option[aria-disabled="true"] {
+  color: var(--brand-muted);
+  background: transparent;
+  cursor: not-allowed;
+}
+.sp-select-group {
+  padding: 12px 12px 5px;
+  color: var(--brand-muted);
+  font: 700 13px/1.5 var(--brand-mono);
+}
+.sp-select-empty {
+  padding: 14px 12px;
+  color: var(--brand-muted);
+  font: 400 15px/1.5 var(--brand-body);
+}
+.toolbar .sp-select {
+  min-inline-size: 140px;
+}
+:is(.experiment-form, .packaging-controls, .pair-selects, .analytics-video-label,
+  .channel-breakdowns label, .analytics-trend label) .sp-select {
+  inline-size: 100%;
+}
+.inline-label .sp-select {
+  inline-size: 215px;
+  flex: 0 1 215px;
+}
+
+/* Native text fields and file inputs keep platform accessibility behavior. */
+body input[type="file"]:not(.import-label input) {
+  max-inline-size: 100%;
+  min-block-size: 44px;
+  padding: 5px;
+  border: 1px solid var(--brand-line);
+  border-radius: var(--control-radius);
+  background: var(--brand-card);
+  color: var(--brand-muted);
+  font: 400 15px/1.5 var(--brand-body);
+}
+body input[type="file"]::file-selector-button {
+  min-block-size: 34px;
+  margin-inline-end: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--brand-line);
+  border-radius: 4px;
+  background: var(--brand-paper);
+  color: var(--brand-ink);
+  font: 700 14px/1.5 var(--brand-body);
+  cursor: pointer;
+}
+body input[type="file"]:hover:not(:disabled)::file-selector-button {
+  border-color: var(--brand-red);
+  background: var(--control-hover);
+}
+body input[type="file"]:disabled::file-selector-button {
+  color: var(--brand-muted);
+  cursor: not-allowed;
+}
+body input[type="file"]:focus-visible {
+  outline: 2px solid var(--brand-red);
+  outline-offset: 3px;
+}
+body .import-label:focus-within {
+  outline: 2px solid var(--brand-red);
+  outline-offset: 3px;
+}
+body input:is([type="checkbox"], [type="radio"]):not(.segmented input) {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex: 0 0 20px;
+  inline-size: 20px;
+  block-size: 20px;
+  min-inline-size: 20px;
+  min-block-size: 20px;
+  padding: 0;
+  margin: 0 7px 0 0;
+  border: 1px solid var(--brand-muted);
+  border-radius: 4px;
+  background: var(--brand-card);
+  color: var(--brand-card);
+  vertical-align: -4px;
+  cursor: pointer;
+}
+body input[type="radio"]:not(.segmented input) {
+  border-radius: 50%;
+}
+body input:is([type="checkbox"], [type="radio"]):not(.segmented input):checked {
+  border-color: var(--brand-red);
+  background: var(--brand-red);
+}
+body input[type="checkbox"]:not(.segmented input):checked::before {
+  content: "";
+  inline-size: 6px;
+  block-size: 10px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+body input[type="radio"]:not(.segmented input):checked::before {
+  content: "";
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+body input[type="checkbox"]:not(.segmented input):indeterminate {
+  border-color: var(--brand-red);
+  background: var(--brand-red);
+}
+body input[type="checkbox"]:not(.segmented input):indeterminate::before {
+  content: "";
+  inline-size: 10px;
+  block-size: 2px;
+  background: currentColor;
+}
+body input:is([type="checkbox"], [type="radio"]):not(.segmented input):hover:not(:disabled) {
+  border-color: var(--brand-red);
+}
+body input:is([type="checkbox"], [type="radio"]):not(.segmented input):focus-visible {
+  outline: 2px solid var(--brand-red);
+  outline-offset: 3px;
+}
+body input:is([type="checkbox"], [type="radio"]):not(.segmented input):disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+/* Disclosure markers remain visible in both collapsed and expanded states. */
+body details > summary,
+body.studio details[class] > summary,
+body.studio .pair-card details > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-block-size: 44px;
+  box-sizing: border-box;
+  list-style: none;
+  color: var(--brand-ink);
+  font: 700 15px/1.5 var(--brand-body);
+  cursor: pointer;
+}
+body details > summary::-webkit-details-marker {
+  display: none;
+}
+body details > summary::marker {
+  content: "";
+}
+body details > summary::before {
+  content: "";
+  flex: 0 0 7px;
+  inline-size: 7px;
+  block-size: 7px;
+  margin-inline: 3px 2px;
+  border: solid var(--brand-red);
+  border-width: 0 2px 2px 0;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+body details[open] > summary::before {
+  transform: translateY(-2px) rotate(45deg);
+}
+body details > summary:hover {
+  color: var(--brand-red);
+}
+body details > summary:focus-visible {
+  outline: 2px solid var(--brand-red);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* Only explicit action buttons receive button chrome, never data selectors. */
+body :is(button.control, a.control, button.button, a.button, label.button,
+  input[type="submit"], input[type="button"], .pagination button),
+body.studio .button {
+  min-block-size: 44px;
+  box-sizing: border-box;
+  border-radius: var(--control-radius);
+  font: 700 15px/1.5 var(--brand-body);
+  text-decoration: none;
+  transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+body :is(button.control, a.control, .pagination button) {
+  padding: 10px 13px;
+  border: 1px solid var(--brand-line);
+  background: var(--brand-card);
+  color: var(--brand-ink);
+}
+body :is(button.control, a.control, .pagination button):hover:not(:disabled):not([aria-disabled="true"]),
+body .button.secondary:hover:not(:disabled):not([aria-disabled="true"]) {
+  border-color: var(--brand-red);
+  background: var(--control-hover);
+  color: var(--brand-ink);
+}
+body .button:not(.secondary):hover:not(:disabled):not([aria-disabled="true"]) {
+  border-color: var(--brand-red);
+  background: var(--brand-red);
+  color: white;
+}
+body :is(button.control, a.control, button.button, a.button,
+  input[type="submit"], input[type="button"], .pagination button):active:not(:disabled):not([aria-disabled="true"]) {
+  border-color: var(--brand-ink);
+  background: var(--brand-ink);
+  color: var(--brand-card);
+}
+body :is(button.control, a.control, button.button, a.button, label.button,
+  input[type="submit"], input[type="button"], .pagination button):focus-visible {
+  outline: 2px solid var(--brand-red);
+  outline-offset: 3px;
+}
+body :is(button.control, button.button, input[type="submit"],
+  input[type="button"], .pagination button):disabled,
+body :is(a.control, a.button)[aria-disabled="true"] {
+  border-color: var(--brand-line);
+  background: var(--brand-paper);
+  color: var(--brand-muted);
+  opacity: .7;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+@media (max-width: 540px) {
+  .toolbar .sp-select {
+    inline-size: 100%;
+    min-inline-size: 0;
+  }
+  .table-toolbar > div > label {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
+  .table-toolbar .sp-select {
+    max-inline-size: 100%;
+  }
+  body .sp-select-button {
+    gap: 12px;
+    padding: 10px 12px;
+  }
+  .sp-select-option {
+    padding-block: 12px;
+  }
+  body .toolbar #export-report {
+    font-size: 0;
+    min-inline-size: 44px;
+    padding-inline: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body :is(input, textarea, select, .sp-select-button, .sp-select-chevron,
+    .control, .button), body details > summary::before {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .sp-select-option.is-selected,
+  .sp-select-option[aria-selected="true"] {
+    outline: 1px solid Highlight;
+    outline-offset: -2px;
+  }
+  .sp-select-option.is-selected::after,
+  .sp-select-option[aria-selected="true"]::after {
+    border-color: Highlight;
+  }
+  body input:is([type="checkbox"], [type="radio"]):not(.segmented input) {
+    appearance: auto;
+  }
+  body input:is([type="checkbox"], [type="radio"]):not(.segmented input)::before {
+    content: none;
+  }
+}
+@media print {
+  .sp-select-popup {
+    display: none;
+  }
+}
+
+/* Keep enhanced controls within the original responsive form columns. */
+.studio .pair-selects label,.studio .field-pair>label{min-inline-size:0}
+.studio .field-pair{grid-template-columns:repeat(2,minmax(0,1fr))}
+.studio .analytics-trend .sp-select{width:min(215px,100%)}
+.studio .channel-breakdowns .sp-select{width:min(230px,100%)}
+@media(max-width:1100px){.studio .pair-selects .sp-select{max-width:240px;min-width:110px}}
+@media(max-width:760px){.studio .field-pair{grid-template-columns:minmax(0,1fr)}.studio .pair-selects .sp-select{max-width:100%}}
