@@ -2,6 +2,7 @@ import { windowMetrics, groupTests, metadataAudit, validateNotebook, mergeNotebo
 import { csvCell } from '/lib/report-model.mjs';
 import { createReportRefresh } from '/refresh.js';
 import { mountUploadAnalytics } from '/upload-analytics.js';
+import { youtubeThumbnailPreview } from '/thumbnail-preview.js';
 
 const $ = selector => document.querySelector(selector);
 const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -68,10 +69,15 @@ function download(filename, contents, type) {
 
 function historyFor(id) { return data.history?.videos?.find(video => video.videoId === id); }
 function videoFor(id) { return data.videos.find(video => video.id === id); }
+function previewThumbnail(video, original) {
+  const apiPreview = data.uploadAnalytics?.videos?.find(item => item.id === video.id)?.thumbnail ||
+    video.metadata?.thumbnails?.high?.url;
+  return youtubeThumbnailPreview(original, video.id, apiPreview);
+}
 function imageHTML(path, caption, evidence = false) {
   const url = asset(path);
   if (!url) return '<div class="missing-image">Image not recovered<br>See the saved evidence notes.</div>';
-  return `<button class="image-button" type="button" data-preview="${escapeHTML(url)}" data-caption="${escapeHTML(caption)}" aria-label="${escapeHTML(`Enlarge ${evidence ? 'saved screenshot for' : 'thumbnail paired with'} ${caption}`)}"><img loading="lazy" src="${escapeHTML(url)}" alt="${escapeHTML(evidence ? `Saved test screenshot: ${caption}` : `Thumbnail paired with: ${caption}`)}"></button>${evidence ? '<p>Original test screenshot · separate thumbnail not recovered</p>' : ''}`;
+  return `<button class="image-button" type="button" data-preview="${escapeHTML(url)}" data-caption="${escapeHTML(caption)}" aria-label="${escapeHTML(`Enlarge ${evidence ? 'saved screenshot for' : 'thumbnail paired with'} ${caption}`)}"><img loading="lazy" data-archived-thumbnail src="${escapeHTML(url)}" alt="${escapeHTML(evidence ? `Saved test screenshot: ${caption}` : `Thumbnail paired with: ${caption}`)}"></button>${evidence ? '<p>Original test screenshot · separate thumbnail not recovered</p>' : ''}`;
 }
 
 const analyticsFields = [
@@ -307,14 +313,14 @@ function renderComparison() {
   $('#window-note').textContent = `Publication date + the next ${windowDays - 1} calendar dates. First date may be partial; not an exact ${windowDays * 24}-hour comparison. API export through ${date(data.apiThrough)}.${missing.length ? ` Incomplete: ${missing.join(', ')}.` : ''}`;
   $('#comparison-body').innerHTML = rows.map(({ video, metrics }) => {
     const packaging = workshopPackage(video, data.capturedAt);
-    return `<tr><td><div class="episode-row">${packaging.thumbnail ? `<img src="${escapeHTML(packaging.thumbnail)}" alt="" loading="lazy">` : ''}<div><strong>${escapeHTML(video.name)}</strong>${video.name !== packaging.title ? `<small>${escapeHTML(packaging.title)}</small>` : ''}<small>Title captured ${escapeHTML(date(packaging.capturedAt))}${packaging.hostedImage ? ' · hosted image may change' : ''}</small></div></div></td>${['views', 'watchHours', 'subscribersNet'].map(key => `<td class="metric ${!metrics.complete ? 'unavailable' : ''}">${metrics.complete ? number(metrics[key], key === 'watchHours' ? 1 : 0) : 'Incomplete'}</td>`).join('')}<td><small>${escapeHTML(date(metrics.start))}<br>to ${escapeHTML(date(metrics.end))}</small>${!metrics.complete ? `<small>${escapeHTML(metrics.reason)}</small>` : ''}</td></tr>`;
+    return `<tr><td><div class="episode-row">${packaging.thumbnail ? `<img src="${escapeHTML(previewThumbnail(video, packaging.thumbnail))}" ${packaging.hostedImage ? `data-youtube-video="${escapeHTML(video.id)}"` : 'data-archived-thumbnail'} alt="" loading="lazy">` : ''}<div><strong>${escapeHTML(video.name)}</strong>${video.name !== packaging.title ? `<small>${escapeHTML(packaging.title)}</small>` : ''}<small>Title captured ${escapeHTML(date(packaging.capturedAt))}${packaging.hostedImage ? ' · hosted image may change' : ''}</small></div></div></td>${['views', 'watchHours', 'subscribersNet'].map(key => `<td class="metric ${!metrics.complete ? 'unavailable' : ''}">${metrics.complete ? number(metrics[key], key === 'watchHours' ? 1 : 0) : 'Incomplete'}</td>`).join('')}<td><small>${escapeHTML(date(metrics.start))}<br>to ${escapeHTML(date(metrics.end))}</small>${!metrics.complete ? `<small>${escapeHTML(metrics.reason)}</small>` : ''}</td></tr>`;
   }).join('');
 }
 
 function studioCard(video, index) {
   const studio = video.studio || {};
   const packaging = workshopPackage(video, data.capturedAt);
-  const image = packaging.thumbnail;
+  const image = previewThumbnail(video, packaging.thumbnail);
   const values = [
     ['Whole-video CTR', percent(studio.ctrPct)],
     ['Impressions · rounded', studio.impressionsDisplay || 'Not collected'],
@@ -327,7 +333,7 @@ function studioCard(video, index) {
   const freshApi = video.analyticsSource ? `<section class="api-refresh"><span class="pill">Collected API totals</span><dl>${[['Views', number(api.views)], ['Watch hours', number(api.estimatedMinutesWatched == null ? null : api.estimatedMinutesWatched / 60, 1)], ['Avg. view seconds', number(api.averageViewDuration, 1)], ['Avg. % watched', percent(api.averageViewPercentage)], ['Net subscribers', number(video.subscribersNet)], ['Shares', number(api.shares)]].map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHTML(value)}</dd></div>`).join('')}</dl><p class="note">Publication to ${escapeHTML(date(video.analyticsSource.end))} · collected ${escapeHTML(date(video.analyticsSource.capturedAt))}. Whole-video results across all packaging. Current metadata appears in the Metadata section.</p></section>` : '';
   const studioSection = packaging.hasStudio ? `<span class="pill">${video.analyticsSource ? 'Historical Studio snapshot' : 'Whole-video Studio totals'}</span><dl>${values.map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHTML(value)}</dd></div>`).join('')}</dl><p class="note">Since published · captured ${escapeHTML(date(studio.capturedAt || data.studioCapturedAt))}. Published ${escapeHTML(date(video.publishedAt))}. These totals cover different video ages and every title/image used.</p>` :
     '<p class="notice quiet">No historical Studio snapshot has been collected for this upload. CTR and impressions remain unavailable here.</p>';
-  return `<article class="video-card"><div class="video-card-head">${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(`Thumbnail for ${video.name}`)}" loading="lazy">` : ''}<div><span class="eyebrow">VIDEO ${index === 0 ? 'A' : 'B'} / ${escapeHTML(video.name)}</span><p>${escapeHTML(packaging.title)}</p></div></div><p class="note">Title captured ${escapeHTML(date(packaging.capturedAt))}. ${packaging.hostedImage ? 'YouTube hosts this thumbnail URL; the served image may change after capture.' : 'The local image and title are the historical saved package.'}</p>${freshApi}${studioSection}<a href="https://studio.youtube.com/video/${encodeURIComponent(video.id)}/analytics" target="_blank" rel="noopener noreferrer">Open video analytics in Studio ↗</a></article>`;
+  return `<article class="video-card"><div class="video-card-head">${image ? `<img src="${escapeHTML(image)}" ${packaging.hostedImage ? `data-youtube-video="${escapeHTML(video.id)}"` : 'data-archived-thumbnail'} alt="${escapeHTML(`Thumbnail for ${video.name}`)}" loading="lazy">` : ''}<div><span class="eyebrow">VIDEO ${index === 0 ? 'A' : 'B'} / ${escapeHTML(video.name)}</span><p>${escapeHTML(packaging.title)}</p></div></div><p class="note">Title captured ${escapeHTML(date(packaging.capturedAt))}. ${packaging.hostedImage ? 'YouTube hosts this thumbnail URL; the served image may change after capture.' : 'The local image and title are the historical saved package.'}</p>${freshApi}${studioSection}<a href="https://studio.youtube.com/video/${encodeURIComponent(video.id)}/analytics" target="_blank" rel="noopener noreferrer">Open video analytics in Studio ↗</a></article>`;
 }
 
 function renderRetention(videos) {
@@ -402,10 +408,10 @@ function renderMetadata() {
   $('#metadata-intro').textContent = collected ? `${collected} of ${data.videos.length} episodes have dated YouTube Data API metadata. These current title, description and tag captures are separate from older test results and Studio cards. A character count is not an SEO score.` : 'Title length and recovered packaging are available now. Descriptions and tags have not been collected. Collection dates will appear when a verified YouTube refresh supplies them.';
   $('#metadata-body').innerHTML = data.videos.map(video => {
     const audit = metadataAudit(video, historyFor(video.id));
-    const thumbnailUrl = workshopThumbnail(video.metadata?.thumbnail?.url);
+    const thumbnailUrl = previewThumbnail(video, workshopThumbnail(video.metadata?.thumbnail?.url));
     const description = audit.descriptionText === null ? '<span class="unavailable">Not collected</span>' : `<details class="metadata-detail"><summary>${escapeHTML(audit.description)}</summary><p>${escapeHTML(audit.descriptionText || 'Description was empty at this capture.')}</p></details>`;
     const tags = audit.tagList === null ? '<span class="unavailable">Not collected</span>' : `<details class="metadata-detail"><summary>${escapeHTML(audit.tags)}</summary><p>${escapeHTML(audit.tagList.length ? audit.tagList.join(' · ') : video.metadata.tagsFieldReturned ? 'The returned tag list was empty.' : 'The API returned no tags field.')}</p></details>`;
-    return `<tr><td><strong>${escapeHTML(video.name)}</strong><small>${escapeHTML(audit.title)}</small>${audit.capturedAt ? `<small>Metadata captured ${escapeHTML(date(audit.capturedAt))}</small>${thumbnailUrl ? `<a class="metadata-thumb" href="${escapeHTML(thumbnailUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHTML(thumbnailUrl)}" loading="lazy" alt="${escapeHTML(`Thumbnail URL returned with ${audit.title}`)}"></a><small>URL observed at capture; hosted image can change.</small>` : ''}` : '<small>Title from the historical saved package</small>'}</td><td>${audit.characters}<small>${audit.words} words</small></td><td>${audit.recoveredTitles}</td><td>${audit.thumbnailCaptures}<small>Historical saved captures</small></td><td>${description}</td><td>${tags}</td></tr>`;
+    return `<tr><td><strong>${escapeHTML(video.name)}</strong><small>${escapeHTML(audit.title)}</small>${audit.capturedAt ? `<small>Metadata captured ${escapeHTML(date(audit.capturedAt))}</small>${thumbnailUrl ? `<a class="metadata-thumb" href="${escapeHTML(thumbnailUrl)}" target="_blank" rel="noopener noreferrer"><img src="${escapeHTML(thumbnailUrl)}" data-youtube-video="${escapeHTML(video.id)}" loading="lazy" alt="${escapeHTML(`Thumbnail preview for ${audit.title}`)}"></a><small>Current YouTube preview; hosted image can change.</small>` : ''}` : '<small>Title from the historical saved package</small>'}</td><td>${audit.characters}<small>${audit.words} words</small></td><td>${audit.recoveredTitles}</td><td>${audit.thumbnailCaptures}<small>Historical saved captures</small></td><td>${description}</td><td>${tags}</td></tr>`;
   }).join('');
 }
 
@@ -639,7 +645,9 @@ function reportingStamp() {
   $('#method-dates').textContent = `Saved reporting evidence · API through ${date(data.apiThrough)} · collected ${date(data.capturedAt)} · historical Studio cards ${date(data.studioCapturedAt)}`;
 }
 function renderUploadAnalytics() {
-  mountUploadAnalytics($('#upload-analytics'), { uploadAnalytics: data.uploadAnalytics, channelBreakdowns: data.channelBreakdowns });
+  mountUploadAnalytics($('#upload-analytics'), {
+    uploadAnalytics: data.uploadAnalytics, channelBreakdowns: data.channelBreakdowns, bulkReach: data.bulkReach,
+  });
 }
 async function reloadStudioReporting() {
   const response = await fetch('/api/workshop-data', { credentials: 'same-origin', cache: 'no-store' });

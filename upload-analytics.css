@@ -37,6 +37,12 @@
 .studio .ua-selected .ua-video {color:var(--red)}
 .studio .ua-select-prompt {padding:16px 0}
 .studio .ua-detail,.studio .ua-channel {margin-top:30px;padding-top:25px;border-top:2px solid var(--line)}
+.studio .ua-reach {margin:24px 0 30px;padding:22px;border:1px solid var(--line);border-radius:8px;background:var(--paper);min-width:0}
+.studio .ua-reach .ua-heading {margin-bottom:0}
+.studio .ua-reach .ua-heading .button {flex-shrink:0}
+.studio .ua-reach .ua-reach-metrics {grid-template-columns:repeat(3,minmax(0,1fr))}
+.studio .ua-reach-table {margin-top:16px}
+.studio .ua-reach-table>summary {font:600 14px/1.65 var(--brand-body,Arial,sans-serif);cursor:pointer;margin-bottom:12px}
 .studio .ua-report-status {display:flex;flex-wrap:wrap;gap:5px 18px;font:13px/1.65 var(--mono);color:var(--muted);padding:12px 0}
 .studio .ua-report-status strong {color:var(--ink);font-weight:600}
 .studio .ua-metrics {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:7px;margin:18px 0;background:var(--cream)}
@@ -63,6 +69,8 @@
   .studio .ua-metrics {grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media(max-width:680px) {
+  .studio .ua-reach {padding:14px}
+  .studio .ua-reach .ua-reach-metrics {grid-template-columns:minmax(0,1fr)}
   .studio .upload-analytics h2 {font-size:25px}
   .studio .upload-analytics h3 {font-size:21px}
   .studio .ua-controls {gap:12px}

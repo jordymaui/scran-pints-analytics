@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filterUploads, reportRowsCsv, uploadTotalsCsv, uploadSeries } from '../upload-analytics.js';
+import {
+  filterUploads, reportRowsCsv, uploadTotalsCsv, uploadSeries, reachRows, reachDailyTotals,
+  reachRowsCsv, mountUploadAnalytics,
+} from '../upload-analytics.js';
 
 const report = rows => ({
   status: 'collected', attemptedAt: '2026-10-20T12:00:00Z',
@@ -58,4 +61,65 @@ test('daily chart preserves absent dates and negative adjustments; retention has
   ], 'audienceWatchRatio', 'elapsedVideoTimeRatio');
   assert.deepEqual(retention.points.map(row => [row.x, row.y]), [[0.1, 0.8], [0.5, 1.2]]);
   assert.equal(retention.segments.length, 1);
+});
+
+const reachRow = (date, videoId, impressions, impressionsCtr, generated = '2026-10-19T10:00:00Z') => ({
+  date, videoId, impressions, impressionsCtr, reportGeneratedAt: generated, capturedAt: '2026-10-20T12:00:00Z',
+});
+
+test('reach sums available impressions without averaging CTR, filling gaps or counting replaced reports twice', () => {
+  const bulk = { daily: [
+    reachRow('2026-10-17', 'aBcDeFgHi12', 100, 0.034),
+    reachRow('2026-10-17', 'aBcDeFgHi12', 120, 3.5, '2026-10-20T10:00:00Z'),
+    reachRow('2026-10-17', 'bBcDeFgHi12', 80, 0),
+    reachRow('2026-10-19', 'aBcDeFgHi12', null, null),
+    reachRow('2026-10-20', 'aBcDeFgHi12', 0, 0),
+  ] };
+  assert.deepEqual(reachDailyTotals(bulk), [
+    { day: '2026-10-17', impressions: 200, uploadsReported: 2 },
+    { day: '2026-10-19', impressions: null, uploadsReported: 1 },
+    { day: '2026-10-20', impressions: 0, uploadsReported: 1 },
+  ]);
+  assert.deepEqual(reachRows(bulk, 'aBcDeFgHi12').map(row => row.impressionsCtr), [3.5, null, 0]);
+  assert.equal(bulk.daily[0].impressions, 100);
+  assert.deepEqual(uploadSeries(reachDailyTotals(bulk), 'impressions').segments.map(segment => segment.map(row => row.y)), [[200], [0]]);
+});
+
+test('reach CSV preserves native CTR values and each report generation/import date', () => {
+  const csv = reachRowsCsv({ daily: [
+    reachRow('2026-10-17', 'aBcDeFgHi12', 100, 0.034),
+    reachRow('2026-10-18', 'bBcDeFgHi12', 50, 3.4),
+  ] }, 'aBcDeFgHi12');
+  assert.match(csv, /"impressionsCtrNative"/);
+  assert.match(csv, /"100","0\.034","2026-10-19T10:00:00Z","2026-10-20T12:00:00Z"/);
+  assert.equal(csv.split('\r\n').length, 2);
+  assert.doesNotMatch(csv, /bBcDeFgHi12/);
+});
+
+test('pending reach is visible without invented metrics, and saved dates stay distinct from latest check', () => {
+  const reach = { innerHTML: '' };
+  const container = {
+    innerHTML: '', classList: { add() {} }, addEventListener() {},
+    querySelector(selector) { return selector === '[data-slot="reach"]' ? reach : null; },
+  };
+  mountUploadAnalytics(container, { bulkReach: {
+    status: 'pending', checkedAt: '2026-10-20T12:00:00Z', dateRange: null, daily: [], availableDates: [], pendingReports: 0,
+  } });
+  assert.match(container.innerHTML, /Thumbnail reach/);
+  assert.match(reach.innerHTML, /Waiting for Google reports/);
+  assert.match(reach.innerHTML, /48 hours/);
+  assert.match(reach.innerHTML, /preceding 30 days/);
+  assert.doesNotMatch(reach.innerHTML, /<dd>|<svg/);
+  mountUploadAnalytics(container, { bulkReach: {
+    status: 'partial', checkedAt: '2026-10-20T12:00:00Z', pendingReports: 2,
+    dateRange: { start: '2026-10-16', end: '2026-10-17', timezone: 'America/Los_Angeles' },
+    availableDates: [{ date: '2026-10-16', publicRows: 0 }, { date: '2026-10-17', publicRows: 1 }],
+    daily: [reachRow('2026-10-17', 'aBcDeFgHi12', 100, 0.034)],
+  } });
+  assert.match(reach.innerHTML, /2 reports waiting to import/);
+  assert.match(reach.innerHTML, /Reported dates: 2026-10-17 to 2026-10-17/);
+  assert.match(reach.innerHTML, /Imported report coverage: 2026-10-16 to 2026-10-17/);
+  assert.match(reach.innerHTML, /Last checked 2026-10-20/);
+  assert.match(reach.innerHTML, /2 daily reports imported/);
+  assert.match(reach.innerHTML, /<dd>100<\/dd>/);
 });
