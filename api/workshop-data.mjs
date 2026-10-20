@@ -1,4 +1,5 @@
-import { json } from '../lib/auth.mjs';
+import { json, privateHeaders } from '../lib/auth.mjs';
+import { gzipSync } from 'node:zlib';
 import { loadReportingInputs } from '../lib/cloud-report.mjs';
 import { validateSocialImport } from '../lib/social-schema.mjs';
 import { validateChannelBreakdowns, validateUploadAnalytics } from '../lib/youtube-breakdowns.mjs';
@@ -8,6 +9,25 @@ import { projectStudioSnapshot } from '../lib/studio-projection.mjs';
 const ACTIVITY_FIELDS = ['views', 'estimatedMinutesWatched', 'averageViewDuration', 'averageViewPercentage',
   'likes', 'comments', 'shares', 'subscribersGained', 'subscribersLost'];
 const COUNTS = new Set(['views', 'likes', 'comments', 'shares', 'subscribersGained', 'subscribersLost']);
+export function sendStudioReport(req, res, report) {
+  const body = JSON.stringify(report);
+  const acceptsGzip = String(req.headers?.['accept-encoding'] || '').split(',').some(part => {
+    const [name, ...parameters] = part.trim().split(';');
+    const quality = parameters.find(value => value.trim().startsWith('q='));
+    const q = quality ? Number(quality.trim().slice(2)) : 1;
+    return name.trim().toLowerCase() === 'gzip' && q > 0 && q <= 1;
+  });
+  privateHeaders(res);
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Vary', 'Cookie, Accept-Encoding');
+  // Keep the full history while avoiding the function response-size ceiling.
+  if (acceptsGzip && Buffer.byteLength(body) > 512000) {
+    res.setHeader('Content-Encoding', 'gzip');
+    return res.end(gzipSync(body));
+  }
+  res.end(body);
+}
 export function validateChannelAnalytics(report) {
   const invalid = () => { throw Error('Invalid saved channel Analytics report.'); };
   const keys = (value, expected) => value && typeof value === 'object' && !Array.isArray(value) &&
@@ -69,7 +89,7 @@ export function createWorkshopDataHandler({ loadInputs = loadReportingInputs } =
           bulkReach = projectYouTubeBulkReach(snapshot.bulkReach, (uploadAnalytics?.videos || []).map(video => video.id));
         }
       } catch { /* Optional bulk reports never hide validated Analytics reports. */ }
-      return json(res, 200, projectStudioSnapshot(snapshot, {
+      return sendStudioReport(req, res, projectStudioSnapshot(snapshot, {
         historicalSnapshot, channelAnalytics, channelBreakdowns, shortsAnalytics, uploadAnalytics, bulkReach,
         storageStatus, snapshotOrigin: origins.youtube,
       }));
