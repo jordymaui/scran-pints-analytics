@@ -52,10 +52,10 @@
         <article class="connection-card" data-source="instagram">
           <div class="connection-card-top"><span class="source-number">03</span><span class="pill" data-field="status">Checking</span></div>
           <h2>Instagram</h2><p class="connection-subtitle">Account &amp; content insights</p>
-          <p>Instagram reporting needs the correct professional account, a Meta app and approved read access. Availability depends on the account and granted permissions.</p>
+          <p>Connect @scranpints as a Creator or Business account to collect post performance, daily views and available follower demographics.</p>
           <dl data-field="details"></dl>
           <p class="connection-help" data-field="help"></p>
-          <div class="connection-actions" data-team-control hidden><button class="button secondary" data-sync="instagram" type="button" disabled>Refresh Instagram</button></div>
+          <div class="connection-actions" data-team-control hidden><form action="/api/connections/instagram" method="post"><button class="button" id="connect-instagram" type="submit" disabled>Connect Instagram ↗</button></form><button class="button secondary" data-sync="instagram" type="button" disabled>Refresh Instagram</button></div>
         </article>
         <article class="connection-card" data-source="tiktok">
           <div class="connection-card-top"><span class="source-number">04</span><span class="pill" data-field="status">Checking</span></div>
@@ -63,10 +63,10 @@
           <p>Collect permitted video views, likes, comments and shares. Watch time, retention and unique reach are not supplied by the Display API collector.</p>
           <dl data-field="details"></dl>
           <p class="connection-help" data-field="help"></p>
-          <div class="connection-actions" data-team-control hidden><button class="button secondary" data-sync="tiktok" type="button" disabled>Refresh TikTok</button></div>
+          <div class="connection-actions" data-team-control hidden><form action="/api/connections/tiktok" method="post"><button class="button" id="connect-tiktok" type="submit" disabled>Connect TikTok ↗</button></form><button class="button secondary" data-sync="tiktok" type="button" disabled>Refresh TikTok</button></div>
         </article>
       </section>
-      <aside class="reporting-note"><span class="eyebrow">REFRESH DETAILS</span><h3>Report refreshes</h3><p>Reporting runs on the server and saves successful collections. A failed refresh keeps the previous evidence. A connection alone does not mean a fresh report has been collected.</p><p>The team manages account connections and report refreshes. Saved analytics and connection status are viewable without signing in.</p><a href="/workshop.html">Open Studio ↗</a></aside>
+      <aside class="reporting-note"><span class="eyebrow">REFRESH DETAILS</span><h3>Report refreshes</h3><p>Reporting runs on the server and saves successful collections. A failed refresh keeps the previous evidence. A connection alone does not mean a fresh report has been collected.</p><p>The team connects accounts once. YEET can refresh connected reporting accounts without signing in.</p><a href="/workshop.html">Open Studio ↗</a></aside>
     </div>
     <footer><img src="/assets/optimized/3f526c1560f0-480.webp" alt="Scran &amp; Pints"><p>Scran &amp; Pints Analytics</p><nav aria-label="Information"><a href="/privacy.html">Privacy</a> · <a href="/terms.html">Usage notice</a> · <a href="#main">Back to top ↑</a></nav></footer>
   </main>

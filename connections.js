@@ -5,8 +5,8 @@ const errors = {
   youtube_not_configured: 'YouTube reporting is not configured on the server yet. The Google app credentials need to be added before connecting.',
   storage_not_configured: 'Shared reporting storage is not configured yet.',
   auth_not_configured: 'Team sign-in is not configured yet.',
-  consent_cancelled: 'Google consent was cancelled. No new reporting connection was saved.',
-  connection_expired: 'That connection attempt expired or no longer matches this signed-in session. Start Connect YouTube again.',
+  consent_cancelled: 'Consent was cancelled. No new reporting connection was saved.',
+  connection_expired: 'That connection attempt expired or no longer matches this signed-in session. Start the connection again.',
   offline_grant_missing: 'Google did not return an offline reporting grant. Reconnect and approve the read-only permissions.',
   reporting_scopes_required: 'The returned permissions did not match the supported read-only reporting access. No connection was saved.',
   wrong_youtube_channel: 'That Google selection did not identify the Scran & Pints YouTube channel. Connect again and select the account or Brand Account that owns it.',
@@ -14,6 +14,21 @@ const errors = {
   google_unavailable: 'Google could not complete this connection. Try again shortly.',
   connection_save_failed: 'The reporting grant could not be saved. Try connecting again after shared storage is available.',
   connection_unavailable: 'The reporting connection is unavailable. Try again shortly.',
+  instagram_not_configured: 'Instagram app credentials need to be added to the hosted server before connecting.',
+  instagram_grant_missing: 'Instagram did not return a usable reporting grant. The previous connection was kept.',
+  instagram_scopes_required: 'Instagram needs the basic account and Insights read permissions. No new connection was saved.',
+  wrong_instagram_account: 'Select the @scranpints Creator or Business account. No new connection was saved.',
+  instagram_account_verification_failed: 'Instagram could not verify the account. The previous connection was kept.',
+  instagram_unavailable: 'Instagram could not complete the connection. Try again shortly.',
+  tiktok_not_configured: 'TikTok app credentials need to be added to the hosted server before connecting.',
+  tiktok_connection_expired: 'That TikTok connection attempt expired. Start Connect TikTok again.',
+  tiktok_grant_invalid: 'TikTok did not return a usable reporting grant. The previous connection was kept.',
+  tiktok_reporting_scopes_required: 'TikTok needs the approved profile, statistics and video-list read permissions.',
+  wrong_tiktok_account: 'Select the @scranpints TikTok account. No new connection was saved.',
+  tiktok_account_verification_failed: 'TikTok could not verify the account. The previous connection was kept.',
+  tiktok_connection_save_failed: 'The TikTok grant could not be saved. The previous connection was kept.',
+  tiktok_consent_cancelled: 'TikTok consent was cancelled. No new connection was saved.',
+  tiktok_unavailable: 'TikTok could not complete the connection. Try again shortly.',
 };
 const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const formatDate = value => {
@@ -71,7 +86,7 @@ function renderStatus() {
     let help;
     if (source === 'youtube') help = connected ? 'The channel owner has connected YouTube Analytics. Channel, episode and packaging reports keep their own source dates.' : publicReady ? 'Public channel counters are available. An owner connection is needed for watch time, retention and other YouTube Analytics reports.' : 'YouTube reporting has not been configured yet.';
     if (source === 'youtube-shorts') help = connected ? 'Shorts reporting uses the channel’s YouTube connection. Views and engaged views are reported separately.' : 'A YouTube owner connection is needed to collect a separate Shorts Analytics report.';
-    if (source === 'instagram') help = connected ? 'A reporting grant is stored. Refresh availability still depends on the connected account and the Instagram integration.' : 'Meta app and professional-account reporting access still need setup. No Instagram connection has been recorded.';
+    if (source === 'instagram') help = connected ? 'The account is connected. A refresh collects available media counters, daily views and follower demographics.' : 'A Creator account works too. The Meta app must be configured before the owner can approve read-only reporting.';
     if (source === 'tiktok') help = connected ? 'A reporting grant is stored. A refresh collects the counters the connected app is allowed to read.' : 'A TikTok developer app, approved scopes and account authorisation still need setup. No TikTok connection has been recorded.';
     card.querySelector('[data-field="help"]').textContent = verified ? help : 'Connection status could not be verified. Previously collected reports remain available.';
     const button = card.querySelector('[data-sync]');
@@ -82,6 +97,11 @@ function renderStatus() {
   }
   $('#connect-youtube').disabled = !teamAccess || !current.configured || !current.setup?.youtubeOAuth || !!busySource || statusPending;
   $('#connect-youtube').textContent = platforms.get('youtube')?.connected ? 'Reconnect YouTube ↗' : 'Connect YouTube ↗';
+  for (const id of ['instagram', 'tiktok']) {
+    const connect = $(`#connect-${id}`);
+    connect.disabled = !teamAccess || !current.configured || !current.setup?.[`${id}OAuth`] || !!busySource || statusPending;
+    connect.textContent = `${platforms.get(id)?.connected ? 'Reconnect' : 'Connect'} ${sourceNames[id]} ↗`;
+  }
   $('#reload-status').disabled = !!busySource || statusPending;
 }
 
@@ -102,6 +122,9 @@ async function loadStatus({ showCallback = false } = {}) {
       if (error) message(errors[error] || 'The connection could not complete. Start a new connection attempt.');
       else if (params.get('connected') === 'youtube' && result.platforms.some(p => p.id === 'youtube' && p.connected === true)) {
         message('The Scran & Pints YouTube reporting connection is saved. YouTube and Shorts reports can now be refreshed.', true);
+      }
+      else if (['instagram', 'tiktok'].includes(params.get('connected')) && result.platforms.some(p => p.id === params.get('connected') && p.connected === true)) {
+        message(`${sourceNames[params.get('connected')]} is connected. Refresh its report to add the latest available numbers to the dashboard and YEET.`, true);
       }
       if (error || params.has('connected')) history.replaceState(null, '', '/connections.html');
     }
@@ -153,8 +176,10 @@ async function sync(source) {
 }
 $('#reload-status').addEventListener('click', () => loadStatus());
 document.querySelectorAll('[data-sync]').forEach(button => button.addEventListener('click', () => sync(button.dataset.sync)));
-$('#connect-youtube').form.addEventListener('submit', event => {
-  if (!teamAccess || $('#connect-youtube').disabled) event.preventDefault();
-});
+for (const id of ['youtube', 'instagram', 'tiktok']) {
+  $(`#connect-${id}`).form.addEventListener('submit', event => {
+    if (!teamAccess || $(`#connect-${id}`).disabled) event.preventDefault();
+  });
+}
 loadStatus({ showCallback: true });
 loadTeamAccess();

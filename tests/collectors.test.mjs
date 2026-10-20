@@ -204,7 +204,7 @@ test('missing configuration and upstream failures expose no credentials or raw p
   let calls = 0;
   const missing = await collectSocial({ env: {}, fetchImpl: async () => { calls++; throw new Error('should not call'); } });
   assert.equal(calls, 0);
-  assert.deepEqual(missing.statuses.map(row => row.status), ['not-configured', 'blocked', 'not-configured']);
+  assert.deepEqual(missing.statuses.map(row => row.status), ['not-configured', 'not-configured', 'not-configured']);
   const failed = await collectSocial({
     sources: ['tiktok'], env: { TIKTOK_ACCESS_TOKEN: 'private-secret-value' },
     fetchImpl: async () => { throw new Error('private-secret-value https://token-bearing.example'); },
