@@ -9,7 +9,7 @@ export { validateCampaigns } from '../lib/campaign-schema.mjs';
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const PUBLIC_OUTPUT = resolve(ROOT, 'public-dist');
 export const PUBLIC_FILES = Object.freeze([
-  'index.html', 'sponsor.html', 'dashboard.js', 'dashboard.css',
+  'index.html', 'sponsor.html', 'dashboard.js', 'dashboard.css', 'brand-tokens.css',
   'workshop.html', 'workshop.js', 'workshop.css',
   'login.html', 'login.js', 'login.css', 'favicon.png',
   'connections.html', 'connections.js', 'connections.css',
