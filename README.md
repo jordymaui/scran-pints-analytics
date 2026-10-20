@@ -13,6 +13,7 @@ The public API projects approved fields from saved cloud reports. If storage is 
 | `/` | Public overview and advanced platform reporting |
 | `/sponsor.html` | Public YEET report; confirmed campaign placements are separate from channel context |
 | `/api/report` | Public, allowlisted reporting JSON |
+| `/api/public-refresh` | Public same-origin YouTube sync; shared provider lock and five-minute cooldown. GET reads sync status. |
 | `/workshop.html`, `/connections.html` | Public Studio reports and connection status; management actions require approved team sign-in |
 | `/api/workshop-data`, `/api/connection-status` | Public, explicitly projected Studio reports and sanitized connection status |
 | `/api/workshop-notebook` | Authenticated shared notebook; unpublished notes remain private |

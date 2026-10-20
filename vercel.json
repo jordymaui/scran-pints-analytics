@@ -12,6 +12,7 @@
     "api/workshop-data.mjs": { "includeFiles": "{data.json,integrations/social.json,integrations/campaigns.json}", "maxDuration": 60 },
     "api/report.mjs": { "includeFiles": "{data.json,integrations/social.json,integrations/campaigns.json}", "maxDuration": 60 },
     "api/sync.mjs": { "includeFiles": "data.json", "maxDuration": 300 },
+    "api/public-refresh.mjs": { "includeFiles": "data.json", "maxDuration": 300 },
     "api/workshop-notebook.mjs": { "maxDuration": 60 },
     "api/connection-status.mjs": { "maxDuration": 60 },
     "api/connections/youtube.mjs": { "maxDuration": 60 },

@@ -7,7 +7,7 @@
 - Keep whole-video CTR, reach, retention and watch time distinct from native test watch-time share. Combined title/image tests support pairing conclusions, not causal attribution to one element.
 - Preserve full test rounds and their source dates before replacing results. Label hypotheses and inconclusive results honestly.
 - Never put credentials, OAuth tokens or private financial records in client assets or git.
-- Studio reports and Connections status are public to view. Keep shared notebook records, account changes and report refresh actions restricted to approved team accounts; expose only explicitly selected reporting fields and approved thumbnail images.
+- Studio reports and Connections status are public to view. YEET may trigger a fixed YouTube reporting sync through the public refresh endpoint, protected by the shared provider lease and server-side cooldown. Keep shared notebook records, account changes and other management actions restricted to approved team accounts; expose only explicitly selected reporting fields and approved thumbnail images.
 - Editing this dashboard does not authorize changing YouTube titles, thumbnails, tests or publication settings.
 - The existing live site is https://scran-pints-analytics.vercel.app. Repo creation did not change its deployment or access settings.
 - Run `npm run dev` for development and `npm run build` before deployment. Serve only the generated `public-dist` directory through the application server; the repository root contains protected workshop evidence.

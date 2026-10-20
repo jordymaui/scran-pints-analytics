@@ -136,27 +136,111 @@ function genderChart(entry) {
   return `<div class="yeet-gender-chart"><div class="yeet-gender-track" aria-hidden="true">${groups.map((row, index) => `<i class="yeet-gender-${index}" style="width:${Math.min(100, row.value)}%"></i>`).join('')}</div><div class="yeet-gender-legend">${groups.map((row, index) => `<div><i class="yeet-gender-${index}" aria-hidden="true"></i><span>${escapeHTML(labels[row.key] || row.key)}</span><strong>${number(row.value)}%</strong></div>`).join('')}</div></div>`;
 }
 
+// A public refresh has one fixed provider/account on the server. Joining an
+// existing run waits for a new completion, rather than treating a saved report
+// or an idle lease as proof that fresh YouTube data was collected.
+export async function syncPublicYouTube({ request = fetch, now = Date.now,
+  wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)),
+  timeout = 285_000 } = {}) {
+  const startedAt = now(), deadline = startedAt + timeout;
+  const read = async method => {
+    const remaining = deadline - now();
+    if (remaining <= 0) throw Error('Refresh timed out');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.min(remaining, method === 'GET' ? 15_000 : timeout));
+    try {
+      const response = await request('/api/public-refresh', { method, cache: 'no-store', credentials: 'omit', signal: controller.signal });
+      const result = await response.json();
+      if (!result || typeof result !== 'object' || Array.isArray(result)) throw Error('Invalid refresh response');
+      if (!response.ok && !['busy', 'recent', 'failed'].includes(result.status)) throw Error('Refresh failed');
+      return result;
+    } finally { clearTimeout(timer); }
+  };
+  const result = await read('POST');
+  if (['refreshed', 'partial', 'recent', 'failed'].includes(result.status)) return result;
+  if (result.status !== 'busy') throw Error('Invalid refresh response');
+  let baseline = Date.parse(result.lastSync?.completedAt), retriedAfterIdle = false;
+  while (now() < deadline) {
+    await wait(Math.min(3_000, deadline - now()));
+    const saved = await read('GET');
+    if (typeof saved.running !== 'boolean') throw Error('Invalid refresh status');
+    const completedAt = Date.parse(saved.lastSync?.completedAt);
+    const advanced = Number.isFinite(completedAt) && (Number.isFinite(baseline)
+      ? completedAt > baseline : completedAt >= startedAt);
+    if (saved.running) continue;
+    if (!advanced) {
+      // Shorts uses the same provider lease but does not complete a channel
+      // report. Once that lease is free, start the requested channel sync.
+      if (!retriedAfterIdle) {
+        retriedAfterIdle = true;
+        const retried = await read('POST');
+        if (['refreshed', 'partial', 'recent', 'failed'].includes(retried.status)) return retried;
+        if (retried.status !== 'busy') throw Error('Invalid refresh response');
+        const retriedBaseline = Date.parse(retried.lastSync?.completedAt);
+        if (Number.isFinite(retriedBaseline)) baseline = retriedBaseline;
+      }
+      continue;
+    }
+    const status = saved.lastSync?.status === 'ready'
+      ? saved.lastSync.errorCode === 'partial_refresh' ? 'partial' : 'refreshed' : 'failed';
+    return { ...saved, status };
+  }
+  throw Error('Refresh timed out');
+}
+
+function retryTime(value) {
+  if (!value || !Number.isFinite(Date.parse(value))) return '';
+  return ` Try again after ${new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London', timeZoneName: 'short',
+  }).format(new Date(value))}.`;
+}
+
+function refreshOutcome(result) {
+  const completedAt = result.lastSync?.completedAt;
+  const at = completedAt && Number.isFinite(Date.parse(completedAt)) ? ` at ${new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London', timeZoneName: 'short',
+  }).format(new Date(completedAt))}` : '';
+  if (result.status === 'refreshed') return { updated: true, message: `YouTube data updated${at}.` };
+  if (result.status === 'partial') return { updated: true, message: `Available YouTube data updated${at}.` };
+  if (result.status === 'recent' && (result.lastSyncStatus || result.lastSync?.status) === 'ready') return {
+    updated: true, message: result.lastSync.errorCode === 'partial_refresh'
+      ? 'YouTube was refreshed recently. Available data loaded.'
+      : 'YouTube was refreshed recently. Latest data loaded.',
+  };
+  return { updated: false, message: result.status === 'recent'
+    ? `The last YouTube refresh failed. Saved data loaded.${retryTime(result.retryAt)}`
+    : `YouTube could not be refreshed. Saved data is still shown.${retryTime(result.retryAt)}` };
+}
+
 let report = null, growthDays = 7, refreshing = false, refreshMessage = '';
 const source = () => report?.sources?.find(item => item.id === 'youtube-longform');
 function renderRefresh() {
   const host = document.querySelector('#yeet-refresh');
   if (!host) return;
-  host.innerHTML = `<button type="button" class="report-refresh-trigger ${refreshing ? 'is-refreshing' : ''}" aria-label="Refresh YEET report" ${refreshing ? 'disabled' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 6.1A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.9 5.9"/></svg><span>${refreshing ? 'Refreshing…' : 'Refresh'}</span></button><span class="yeet-refresh-status" role="status" aria-live="polite">${escapeHTML(refreshMessage)}</span>`;
+  host.innerHTML = `<button type="button" class="report-refresh-trigger ${refreshing ? 'is-refreshing' : ''}" aria-label="Refresh YEET report" aria-busy="${refreshing}" ${refreshing ? 'disabled' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 6.1A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.9 5.9"/></svg><span>${refreshing ? 'Syncing YouTube…' : 'Refresh'}</span></button><span class="yeet-refresh-status" role="status" aria-live="polite">${escapeHTML(refreshMessage)}</span>`;
   host.querySelector('button').addEventListener('click', refreshReport);
 }
 
 async function refreshReport() {
   if (refreshing) return;
   refreshing = true;
-  refreshMessage = 'Loading latest saved report…';
+  refreshMessage = '';
   renderRefresh();
   try {
-    const updated = await loadReport();
-    report = updated;
-    refreshMessage = 'Latest saved report loaded.';
-    render();
+    const result = await syncPublicYouTube();
+    const outcome = refreshOutcome(result);
+    try {
+      const updated = await loadReport();
+      report = updated;
+      refreshMessage = outcome.message;
+      render();
+    } catch {
+      refreshMessage = outcome.updated
+        ? 'YouTube synced, but the report could not load. Your previous report is still shown.'
+        : `YouTube could not be refreshed. Your previous report is still shown.${retryTime(result.retryAt)}`;
+    }
   } catch {
-    refreshMessage = 'Refresh failed. Your previous report is still shown.';
+    refreshMessage = 'YouTube refresh could not be confirmed. Your previous report is still shown.';
   } finally {
     refreshing = false;
     renderRefresh();
@@ -165,7 +249,7 @@ async function refreshReport() {
 }
 
 async function loadReport() {
-  const response = await fetch('/api/report', { cache: 'no-store' });
+  const response = await fetch('/api/report', { cache: 'no-store', credentials: 'omit' });
   if (!response.ok) throw Error('Report unavailable');
   const result = await response.json();
   if (result?.schemaVersion !== 1 || !Array.isArray(result.sources)) throw Error('Invalid report');

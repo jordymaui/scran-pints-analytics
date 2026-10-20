@@ -14,6 +14,7 @@ import connectionStatus from '../api/connection-status.mjs';
 import workshopNotebook from '../api/workshop-notebook.mjs';
 import youtubeConnection from '../api/connections/youtube.mjs';
 import sync from '../api/sync.mjs';
+import publicRefresh from '../api/public-refresh.mjs';
 import { json } from '../lib/auth.mjs';
 import { PRIVATE_PAGES } from '../lib/private-files.mjs';
 
@@ -24,6 +25,7 @@ const apiRoutes = new Map([
   ['/api/report', report], ['/api/connection-status', connectionStatus],
   ['/api/workshop-notebook', workshopNotebook], ['/api/connections/youtube', youtubeConnection],
   ['/api/sync', sync],
+  ['/api/public-refresh', publicRefresh],
 ]);
 export const PRIVATE_ROOT_FILES = new Set([
   ...PRIVATE_PAGES, 'data.json', 'image-index.json', 'image-assets.js',
