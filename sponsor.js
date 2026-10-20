@@ -382,7 +382,7 @@ function audienceContent(channel) {
 }
 
 function nativeAudienceContent(audience) {
-  const caption = `Current month · captured ${date(audience.capturedAt)}`;
+  const caption = `Reported followers · captured ${date(audience.capturedAt)}`;
   const labels = { M: 'Male', F: 'Female', U: 'Unspecified', male: 'Male', female: 'Female' };
   const bars = (rows, kind) => {
     let shares = audienceShares(rows);

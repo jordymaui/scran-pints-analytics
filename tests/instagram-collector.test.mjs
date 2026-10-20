@@ -46,7 +46,8 @@ test('Instagram collects all cursor pages, lifetime counters and native daily/au
   assert.equal(result.metrics.views,200);assert.equal(result.metrics.likes,24);assert.equal(result.metrics.comments,6);
   assert.equal(result.metrics.shares,8);assert.equal(result.metrics.followers,123);assert.equal(result.metrics.watchHours,null);
   assert.equal(result.counterScope,'public-content-lifetime');assert.equal(result.daily.length,90);
-  assert.equal(result.daily[0].day,'2026-07-23');assert.equal(result.daily.at(-1).day,'2026-10-20');
+  assert.equal(result.daily[0].day,'2026-07-22');assert.equal(result.daily.at(-1).day,'2026-10-19');
+  assert.equal(result.dateRange.end,'2026-10-19');
   assert.equal(result.dateRange.timezone,'UTC');assert.equal(result.daily[0].views,10);
   assert.deepEqual(result.nativeAudience.age,[{label:'25-34',count:80}]);
   assert.deepEqual(result.nativeAudience.country,[{label:'GB',count:80}]);
