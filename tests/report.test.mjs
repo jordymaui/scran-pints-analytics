@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { buildPublicReport, buildDaily, csvCell, dateInPacific } from '../lib/report-model.mjs';
 const raw = JSON.parse(fs.readFileSync(new URL('../data.json', import.meta.url)));
 test('public projection preserves recorded totals and missing-platform states', () => {
-  const report = buildPublicReport(raw);
+  const report = buildPublicReport(raw, undefined, undefined, { allowHistoricalYouTube: true });
   assert.equal(report.sources[0].metrics.views, raw.videos.reduce((n,v)=>n+v.apiAggregate.views,0));
   assert.equal(report.sources[0].metrics.watchHours, raw.videos.reduce((n,v)=>n+v.apiAggregate.estimatedMinutesWatched,0)/60);
   assert.equal(report.sources[0].metrics.subscribersNet, raw.videos.reduce((n,v)=>n+v.subscribersNet,0));
@@ -12,7 +12,7 @@ test('public projection preserves recorded totals and missing-platform states', 
   assert.ok(report.sources.slice(1).every(p => p.metrics === null && p.status === 'not-connected'));
 });
 test('public export excludes internal test evidence, source paths and drafts', () => {
-  const value = JSON.stringify(buildPublicReport(raw));
+  const value = JSON.stringify(buildPublicReport(raw, undefined, undefined, { allowHistoricalYouTube: true }));
   for (const text of ['openclaw', '/Users/', 'testId', 'thumbnailPath', 'watchTimeSharePct', 'webEvidence', 'history-']) assert.equal(value.includes(text), false, text);
 });
 test('missing episode day is not silently filled with zero or shown as a complete total', () => {
@@ -33,7 +33,7 @@ test('daily coverage starts at publication in Pacific time, not UTC', () => {
 test('incomplete equal-age windows remain unavailable', () => {
   const snapshot=structuredClone(raw);
   snapshot.videos[0].windows['3']={complete:false,views:null,watchHours:null};
-  const row = buildPublicReport(snapshot).sources[0].content[0];
+  const row = buildPublicReport(snapshot, undefined, undefined, { allowHistoricalYouTube: true }).sources[0].content[0];
   assert.equal(row.launchWindows['3'].complete, false);
   assert.equal(row.launchWindows['3'].views, null);
 });
@@ -41,7 +41,7 @@ test('advancing analytics capture date does not redate historical title and thum
   const snapshot=structuredClone(raw);
   snapshot.videos[0].packagingCapturedAt='2026-10-04T14:11:35Z';
   snapshot.capturedAt='2026-10-20T10:00:00Z';
-  const row=buildPublicReport(snapshot).sources[0].content[0];
+  const row=buildPublicReport(snapshot, undefined, undefined, { allowHistoricalYouTube: true }).sources[0].content[0];
   assert.equal(row.packagingCapturedAt,'2026-10-04T14:11:35Z');
 });
 test('CSV export escapes quotes and spreadsheet formula payloads', () => {

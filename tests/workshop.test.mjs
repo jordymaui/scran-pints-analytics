@@ -1,10 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { windowMetrics, groupTests, metadataAudit, validateNotebook, mergeNotebookChanges } from '../lib/workshop-model.mjs';
+import { windowMetrics, groupTests, metadataAudit, validateNotebook, mergeNotebookChanges, workshopThumbnail, workshopPackage } from '../lib/workshop-model.mjs';
 
 const snapshot = JSON.parse(await readFile(new URL('../data.json', import.meta.url), 'utf8'));
 const row = (day, views = 10) => ({ day, views, estimatedMinutesWatched: 60, subscribersGained: 2, subscribersLost: 1 });
+
+test('workshop images allow saved assets and official video image paths only', () => {
+  assert.equal(workshopThumbnail('assets/history-example.jpg'), '/assets/history-example.jpg');
+  assert.equal(workshopThumbnail('https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg'), 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg');
+  for (const bad of [
+    'https://evil.test/vi/abcdefghijk/hqdefault.jpg', 'http://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',
+    'https://i.ytimg.com:444/vi/abcdefghijk/hqdefault.jpg', 'https://user@i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',
+    'https://i.ytimg.com/unrelated.jpg', 'assets/../data.json', 'javascript:alert(1)', null,
+  ]) assert.equal(workshopThumbnail(bad), null);
+});
+
+test('discovered uploads use dated metadata without inventing Studio or native test evidence', () => {
+  const video = {
+    id: 'abcdefghijk', title: 'First capture', thumb: null, discoveredAt: '2026-10-20T12:00:00Z',
+    packagingCapturedAt: '2026-10-20T12:00:00Z',
+    metadata: { title: 'Current capture', capturedAt: '2026-10-21T12:00:00Z', thumbnail: { url: 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg' } },
+  };
+  assert.deepEqual(workshopPackage(video), {
+    title: 'Current capture', thumbnail: video.metadata.thumbnail.url, capturedAt: video.metadata.capturedAt,
+    hostedImage: true, hasStudio: false,
+  });
+  assert.equal(groupTests(undefined).length, 0);
+  assert.equal(metadataAudit(video).thumbnailCaptures, 0);
+  assert.equal(workshopPackage({ ...video, metadata: undefined }).thumbnail, null);
+  const historical = workshopPackage({ ...video, discoveredAt: undefined, thumb: 'assets/abcdefghijk.jpg', studio: { ctrPct: 4 } });
+  assert.equal(historical.title, 'First capture');
+  assert.equal(historical.thumbnail, '/assets/abcdefghijk.jpg');
+  assert.equal(historical.capturedAt, video.packagingCapturedAt);
+  assert.equal(historical.hasStudio, true);
+});
 
 test('same-age windows anchor to publication date, not first available observation', () => {
   const video = { publishedAt: '2026-09-01T23:00:00Z', daily: [row('2026-09-02'), row('2026-09-03'), row('2026-09-04')] };

@@ -1,6 +1,6 @@
 const $ = selector => document.querySelector(selector);
 const sourceIds = ['youtube', 'youtube-shorts', 'instagram', 'tiktok'];
-const sourceNames = { youtube: 'YouTube episodes', 'youtube-shorts': 'YouTube Shorts', instagram: 'Instagram', tiktok: 'TikTok' };
+const sourceNames = { youtube: 'YouTube', 'youtube-shorts': 'Private YouTube Shorts', instagram: 'Instagram', tiktok: 'TikTok' };
 const errors = {
   youtube_not_configured: 'YouTube reporting is not configured on the server yet. The Google app credentials need to be added before connecting.',
   storage_not_configured: 'Shared reporting storage is not configured yet.',
@@ -36,28 +36,28 @@ function renderStatus() {
     const card = $(`[data-source="${source}"]`);
     const status = card.querySelector('[data-field="status"]');
     const connected = platform.connected === true;
-    status.textContent = connected ? 'Connected' : 'Setup needed';
-    status.className = `pill ${connected ? 'connected' : 'pending'}`;
+    const publicReady = source === 'youtube' && current.setup?.youtubePublic === true;
+    status.textContent = connected ? 'Connected' : publicReady ? 'Public counters ready' : 'Setup needed';
+    status.className = `pill ${connected || publicReady ? 'connected' : 'pending'}`;
     const lastSync = platform.lastSync;
-    const syncLabel = !lastSync ? 'No run recorded' : lastSync.status === 'ready' ? 'Completed' :
+    const syncLabel = !lastSync ? 'No run recorded' : lastSync.status === 'ready' ? lastSync.errorCode === 'partial_refresh' ? 'Partly completed · previous capture kept' : 'Completed' :
       { failed: 'Failed · previous data kept', blocked: 'Setup blocked', busy: 'Already running', 'not-connected': 'Not connected' }[lastSync.status] || 'Needs attention';
     card.querySelector('[data-field="details"]').innerHTML = [
-      ['Connection', connected ? `Saved ${formatDate(platform.connectedAt)}` : 'No reporting grant saved'],
-      ['Latest cloud capture', platform.hasSnapshot ? formatDate(platform.capturedAt) : 'No cloud collection yet'],
+      ['Private reporting grant', connected ? `Saved ${formatDate(platform.connectedAt)}` : 'No reporting grant saved'],
+      ...(source === 'youtube' ? [['Public counters', publicReady ? 'Public API configured' : 'Public API key needed']] : []),
+      ['Latest saved collection', platform.hasSnapshot ? formatDate(platform.capturedAt) : 'No cloud collection yet'],
       ['Last refresh', `${syncLabel}${lastSync?.completedAt ? ` · ${formatDate(lastSync.completedAt)}` : ''}`],
     ].map(([label, value]) => `<div><dt>${escapeHTML(label)}</dt><dd>${escapeHTML(value)}</dd></div>`).join('');
     let help;
-    if (source === 'youtube') help = connected ? 'This connection supplies both the episode and Shorts reports. Refresh them separately to see their own coverage.' :
-      current.setup?.youtubeOAuth ? 'Choose the Google account or Brand Account that owns Scran & Pints, then approve the two read-only reporting permissions.' :
-        'The YouTube OAuth client and shared storage must be configured on the server before this button is available.';
-    if (source === 'youtube-shorts') help = connected ? 'Uses the same verified YouTube connection. Shorts remain separate from full episodes in every report.' : 'Connect YouTube first. The same read-only grant covers Shorts reporting.';
+    if (source === 'youtube') help = `${publicReady ? 'Public channel counters can refresh now without account consent. ' : 'The public API key is not configured. '} ${connected ? 'The same refresh also updates the private long-form workshop. Each report keeps its own capture date.' : 'Connect the owning Google account to enable private watch-time, retention and long-form reports.'}`;
+    if (source === 'youtube-shorts') help = 'Shorts are included in the public channel counters; a separate public breakdown is unavailable. This button collects an authorized private Shorts report using the YouTube grant.';
     if (source === 'instagram') help = connected ? 'A reporting grant is stored. Refresh availability still depends on the connected account and the Instagram integration.' : 'Meta app and professional-account reporting access still need setup. No Instagram connection has been recorded.';
     if (source === 'tiktok') help = connected ? 'A reporting grant is stored. A refresh collects the counters the connected app is allowed to read.' : 'A TikTok developer app, approved scopes and account authorisation still need setup. No TikTok connection has been recorded.';
     card.querySelector('[data-field="help"]').textContent = help;
     const button = card.querySelector('[data-sync]');
-    button.disabled = !connected || !!busySource || statusPending;
+    button.disabled = (!connected && !publicReady) || !!busySource || statusPending;
     button.textContent = busySource === source ? 'Collecting report…' : {
-      youtube: 'Refresh episodes', 'youtube-shorts': 'Refresh Shorts', instagram: 'Refresh Instagram', tiktok: 'Refresh TikTok',
+      youtube: 'Refresh YouTube', 'youtube-shorts': 'Refresh private Shorts', instagram: 'Refresh Instagram', tiktok: 'Refresh TikTok',
     }[source];
   }
   $('#connect-youtube').disabled = !current.configured || !current.setup?.youtubeOAuth || !!busySource || statusPending;
@@ -106,7 +106,8 @@ async function loadStatus({ showCallback = false } = {}) {
 }
 
 async function sync(source) {
-  if (!sourceIds.includes(source) || busySource || !current?.platforms.some(p => p.id === source && p.connected === true)) return;
+  if (!sourceIds.includes(source) || busySource || !(current?.platforms.some(p => p.id === source && p.connected === true) ||
+      source === 'youtube' && current?.setup?.youtubePublic === true)) return;
   busySource = source;
   renderStatus();
   message(`Collecting ${sourceNames[source]}. This can take a little while; the existing report stays available until a successful collection is saved.`);
@@ -118,7 +119,8 @@ async function sync(source) {
     }
     const result = await response.json();
     if (response.ok && result.status === 'ready') {
-      message(`${sourceNames[source]} report saved. Captured ${formatDate(result.capturedAt || result.completedAt)}. Open the dashboard or workshop to inspect the dated evidence.`, true);
+      const parts = result.components ? ` Public counters: ${result.components.public.status}. Private Analytics: ${result.components.analytics.status}.` : '';
+      message(`${sourceNames[source]} collection saved.${parts} Open the dashboard or workshop to inspect each report's capture date.`, true);
     } else {
       const text = {
         busy: 'A report using this connection is already running. Check status shortly.',

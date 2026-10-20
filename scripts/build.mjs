@@ -1,7 +1,7 @@
 import { readFile, writeFile, copyFile, mkdir, readdir, lstat, realpath, rm } from 'node:fs/promises';
 import { resolve, relative, dirname, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { buildPublicReport } from '../lib/report-model.mjs';
+import { buildPublicReport, publicYouTubeThumbnail } from '../lib/report-model.mjs';
 import { validateSocialImport } from '../lib/social-schema.mjs';
 import { validateCampaigns } from '../lib/campaign-schema.mjs';
 export { validateCampaigns } from '../lib/campaign-schema.mjs';
@@ -13,6 +13,7 @@ export const PUBLIC_FILES = Object.freeze([
   'workshop.html', 'workshop.js', 'workshop.css',
   'login.html', 'login.js', 'login.css', 'favicon.png',
   'connections.html', 'connections.js', 'connections.css',
+  'privacy.html', 'terms.html', 'notice.css',
   'lib/report-model.mjs', 'lib/workshop-model.mjs',
   'assets/scran-pints-logo.png', 'assets/optimized/3f526c1560f0-480.webp',
 ]);
@@ -35,11 +36,12 @@ export async function buildPublicOutput() {
   ]);
   const social = validateSocialImport(socialRaw);
   const campaigns = validateCampaigns(campaignsRaw, snapshot, social);
-  const report = buildPublicReport(snapshot, social, campaigns);
+  const report = buildPublicReport(snapshot, social, campaigns, { allowHistoricalYouTube: true });
   const files = new Set(PUBLIC_FILES);
   for (const video of snapshot.videos) {
-    if (!/^assets\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)$/.test(video.thumb)) throw new Error('Public thumbnail must be a direct saved episode image.');
-    files.add(video.thumb);
+    if (video.thumb == null && video.discoveredAt) continue;
+    if (!publicYouTubeThumbnail(video.thumb)) throw new Error('Public thumbnail must be a saved episode image or official YouTube image URL.');
+    if (video.thumb.startsWith('assets/')) files.add(video.thumb);
   }
   for (const entry of await readdir(resolve(ROOT, 'fonts'), { withFileTypes: true })) {
     if (!entry.isFile() || !/^[A-Za-z0-9_-]+\.(?:woff2?|ttf|otf)$/.test(entry.name)) throw new Error('Unexpected file in public fonts.');

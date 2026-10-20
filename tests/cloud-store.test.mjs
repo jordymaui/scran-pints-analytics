@@ -1,3 +1,4 @@
+import { publicYouTubeFixture } from './fixtures/public-youtube.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cloudConfig, createCloudStore, CloudStoreError } from '../lib/cloud-store.mjs';
@@ -111,6 +112,7 @@ test('public reports use last-good cloud snapshots without exposing raw archive 
   const bundled = await readBundledInputs();
   const saved = structuredClone(bundled.snapshot);
   saved.videos[0].apiAggregate.views += 17;
+  saved.publicReport = publicYouTubeFixture();
   saved.privateCredentials = { refreshToken: 'NEVER_PUBLIC' };
   const result = await loadPublicReport({ bundled, storeFactory: () => ({
     loadSnapshot: async source => source === 'youtube' ? { payload: saved } : null,
@@ -118,8 +120,8 @@ test('public reports use last-good cloud snapshots without exposing raw archive 
   }) });
   assert.equal(result.storageStatus, 'cloud');
   assert.equal(result.sources[0].snapshotOrigin, 'cloud');
-  assert.equal(result.sources[0].metrics.views, saved.videos.reduce((sum, row) => sum + row.apiAggregate.views, 0));
-  assert.equal(result.sources[0].syncStatus.status, 'failed');
+  assert.equal(result.sources[0].metrics.views, saved.publicReport.channel.views);
+  assert.equal(result.sources[0].syncStatus, null, 'Combined public/private run status is not a public freshness claim');
   assert.doesNotMatch(JSON.stringify(result), /NEVER_PUBLIC|privateCredentials|refreshToken|thumbnailPath|watchTimeSharePct/);
 });
 
@@ -149,6 +151,7 @@ test('one failed platform read preserves successful fresh snapshots from other p
   const bundled = await readBundledInputs();
   const saved = structuredClone(bundled.snapshot);
   saved.videos[0].apiAggregate.views += 123;
+  saved.publicReport = publicYouTubeFixture();
   const result = await loadPublicReport({ bundled, storeFactory: () => ({
     loadSnapshot: async source => {
       if (source === 'instagram') throw Error('Unavailable source');
@@ -158,7 +161,7 @@ test('one failed platform read preserves successful fresh snapshots from other p
   }) });
   assert.equal(result.storageStatus, 'unavailable');
   assert.equal(result.sources[0].snapshotOrigin, 'cloud');
-  assert.equal(result.sources[0].metrics.views, saved.videos.reduce((sum, row) => sum + row.apiAggregate.views, 0));
+  assert.equal(result.sources[0].metrics.views, saved.publicReport.channel.views);
   assert.equal(result.sources.find(row => row.id === 'instagram').snapshotOrigin, 'bundled');
 });
 
@@ -189,7 +192,8 @@ test('verified sponsor evidence survives a fresh Shorts report without individua
   const result = await loadPublicReport(options);
   assert.equal(result.storageStatus, 'cloud');
   const source = result.sources.find(row => row.id === 'youtube-shorts');
-  assert.equal(source.snapshotOrigin, 'cloud');
+  assert.equal(source.snapshotOrigin, 'unavailable');
+  assert.equal(source.metrics, null);
   assert.deepEqual(source.content, [], 'Do not relabel old per-content counters as current');
   assert.equal(result.campaigns[0].placements[0].evidenceUrl, short.content[0].url);
   bundled.campaigns.campaigns[0].placements[0].evidenceUrl = 'https://youtube.com.evil.example/shorts/aBcDeFgHi12';
