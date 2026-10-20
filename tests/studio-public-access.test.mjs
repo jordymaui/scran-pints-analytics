@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
+import { youtubeThumbnailPreview } from '../thumbnail-preview.js';
 import { projectStudioSnapshot, studioThumbnailAssets } from '../lib/studio-projection.mjs';
 import { createWorkshopDataHandler } from '../api/workshop-data.mjs';
 import { createConnectionStatusHandler } from '../api/connection-status.mjs';
@@ -92,7 +93,7 @@ test('Studio projection preserves renderer contracts, dates, metadata distinctio
   element('#analytics-video').value = bundled.videos[0].id;
   element('#packaging-video').value = 'all';
   element('#packaging-scope').value = 'latest';
-  const context = vm.createContext({ ...workshopModel, fixture: projected,
+  const context = vm.createContext({ ...workshopModel, youtubeThumbnailPreview, fixture: projected,
     createReportRefresh: () => ({ mount() {} }),
     document: { querySelector: element, querySelectorAll: () => [] }, window: {},
     Intl, Date, Number, String, Map, Set });

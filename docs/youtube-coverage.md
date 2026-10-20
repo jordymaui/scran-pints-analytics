@@ -2,7 +2,7 @@
 
 The dashboard combines native YouTube API reports with dated evidence captured from YouTube Studio. Coverage means the fields and reporting windows described below. It does not mean every metric, experiment or historical edit visible anywhere in Studio.
 
-The collector uses the existing `youtube.readonly` and `yt-analytics.readonly` grants. It only reads reports and metadata. It does not change titles, thumbnails, tests, publication settings or other channel settings. Public Data API counters use the separate server-side API key. Credentials and provider error bodies are not included in reporting responses.
+The collector uses the existing `youtube.readonly` and `yt-analytics.readonly` grants. It reads reports and metadata, and can create a nonmonetary Reporting API job that schedules daily thumbnail reach files. It does not change titles, thumbnails, tests, publication settings or other channel settings. Public Data API counters use the separate server-side API key. Credentials and provider error bodies are not included in reporting responses.
 
 ## Channel and public counters
 
@@ -53,14 +53,26 @@ The ledger includes verified public long-form videos, Shorts, live content and u
 | Per-upload report | Fields |
 | --- | --- |
 | Aggregate and daily activity | Views, engaged views, estimated minutes watched, average view duration, average percentage viewed, likes, dislikes, comments, shares, subscribers gained and lost, videos added to and removed from playlists |
-| Retention | Elapsed-video-time ratio, audience watch ratio, relative retention performance, started watching, stopped watching and total segment impressions |
+| Retention | Elapsed-video-time ratio, audience watch ratio and relative retention performance. A separate optional request supplies started watching, stopped watching and total segment impressions; unavailable segment fields remain null. |
 | Traffic | Traffic-source type, views and estimated minutes watched |
 | Current observed metadata | Title, description, tags, publication time, duration when supplied, and official thumbnail URL |
 | Observed metadata history | Earlier saved title, description, tags and thumbnail URL observations with their original capture timestamps |
 
 Video-filtered subscriber metrics are attributable to the video watch page and must not be presented as the entire channel's subscription activity. Audience watch ratios and average percentage viewed can exceed 100% because of repeated viewing. Native signed likes adjustments are preserved.
 
-Aggregate, daily and traffic reports are collected in bounded batches, with pagination. Retention uses one video per request, as required by YouTube. Traffic batches also respect the documented queried-video-count × date-count limit of 50,000. Safety limits fail explicitly or retain earlier reports; the collector does not silently slice a report and call it complete. See [query filtering and pagination](https://developers.google.com/youtube/analytics/reference/reports/query) and the [traffic and retention report constraints](https://developers.google.com/youtube/analytics/channel_reports).
+Aggregate, daily and traffic reports are collected in bounded batches, with pagination. When YouTube rejects a multi-upload daily query, the collector retries each affected upload separately, except for authorization or rate-limit failures. Retention uses one video per request, as required by YouTube. Traffic batches also respect the documented queried-video-count × date-count limit of 50,000. Safety limits fail explicitly or retain earlier reports; the collector does not silently slice a report and call it complete. See [query filtering and pagination](https://developers.google.com/youtube/analytics/reference/reports/query) and the [traffic and retention report constraints](https://developers.google.com/youtube/analytics/channel_reports).
+
+## Thumbnail reach from the Reporting API
+
+The bulk collector uses `channel_reach_basic_a1`: daily thumbnail impressions and native thumbnail impressions CTR for each video. These are whole-video measurements, not A/B variant measurements. The Reporting API is a separate Google Cloud service and must be enabled in the connected project's configuration. The existing `yt-analytics.readonly` scope is sufficient. See the official [reach report definition](https://developers.google.com/youtube/reporting/v1/reports/channel_reports#reach-reports) and [authorization requirements](https://developers.google.com/youtube/reporting/guides/authorization).
+
+The integration reuses an existing matching job or creates one when the refresh requests report scheduling. A newly scheduled job does not immediately provide data: Google's guide currently allows up to 48 hours for the first daily report. Initial historical backfill covers the preceding 30 days and can take several days. Generated historical files are downloadable for 30 days; normal daily files for 60 days. Previously imported observations remain dated in the saved report. Older history that Google has not supplied is unavailable. See the [bulk reporting workflow and backfill rules](https://developers.google.com/youtube/reporting/v1/reports/).
+
+Each file keeps its report period, generation time and import time. A newer backfill replaces the entire corresponding period, including a valid empty file. Downloads are limited to 90 files per refresh with at most four concurrent requests; remaining files are explicitly marked pending. Failed downloads retain earlier valid reports. The saved manifest is bounded to 3,660 daily periods and 200,000 public rows; exceeding a safety limit is reported rather than silently dropping history.
+
+Only rows for the expected channel and currently verified public upload IDs are published. Raw CSVs, download URLs, job IDs and credentials are excluded from public output. Daily dates follow Pacific time, including daylight saving changes. Native CTR is preserved without scaling or averaging; the UI must not infer an aggregate CTR from a simple mean of daily values. Google's [metric definition](https://developers.google.com/youtube/reporting/v1/reports/metrics#video_thumbnail_impressions_ctr) describes a percentage calculated from clicks and impressions. The current documentation does not provide a numeric CSV example resolving its serialization scale; verify that scale against an actual generated report before applying a display conversion.
+
+This is still a defined reporting inventory, not every available API family. End-screen and subtitle-use bulk reports, playlist-specific reports, concurrent live-viewer reports and additional reach dimensions are not collected by the current implementation. These are accessible report families rather than evidence that the APIs cannot supply them. See the [Reporting API channel catalog](https://developers.google.com/youtube/reporting/v1/reports/channel_reports) and [Analytics channel catalog](https://developers.google.com/youtube/analytics/channel_reports).
 
 ## Dates, processing and partial results
 
@@ -75,7 +87,7 @@ YouTube documents that a report can end at the latest date for which all request
 
 ## Native tests and historical packaging
 
-The Data API supplies current metadata, not an edit log. The Analytics API reports above do not expose native Studio A/B test rounds, every historical title/thumbnail pairing, variant-level impressions or variant-level CTR. This integration also does not claim API coverage for all Studio reach, unique-viewer or returning-viewer reports.
+The Data API supplies current metadata, not an edit log. The Analytics and bulk reach reports above do not expose native Studio A/B test rounds, every historical title/thumbnail pairing, variant-level impressions or variant-level CTR. Whole-video thumbnail reach is collected through the separate bulk workflow above; its historical availability does not establish coverage for all Studio reach, unique-viewer or returning-viewer reports.
 
 Native A/B evidence is captured from the visible Studio report: variant title and thumbnail pairing, watch-time share when shown, run dates, status and Studio's stated result. A largest share alone is not labelled a winner. For a combined title-and-thumbnail test, the evidence applies to that pairing; it cannot isolate the effect of the title from the image.
 

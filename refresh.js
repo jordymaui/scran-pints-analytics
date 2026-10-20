@@ -92,6 +92,13 @@ function resultDetails(source, result) {
       if (values.length) details.push(`${label}: ${values.join(' · ')}.`);
     }
   }
+  if (source === 'youtube' && result.bulkReach) {
+    const reach = result.bulkReach;
+    const labels = { ready: 'collected', pending: 'waiting for YouTube to generate reports',
+      partial: 'partly collected', 'not-configured': 'not available' };
+    details.push(`Thumbnail impressions / CTR: ${labels[reach.status] || 'unavailable'}${count(reach.reportCount) !== null ? ` · ${reach.reportCount} daily reports saved` : ''}.`);
+    if (count(reach.pendingReportCount) > 0) details.push(`${reach.pendingReportCount} generated reach reports remain to collect.`);
+  }
   return details;
 }
 

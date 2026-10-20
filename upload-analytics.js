@@ -1,5 +1,6 @@
 // The API has already selected public upload metadata and reporting fields.
 // This module never requests credentials or writes channel/account settings.
+import { youtubeThumbnailPreview } from './thumbnail-preview.js';
 const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const numeric = value => typeof value === 'number' && Number.isFinite(value);
@@ -20,6 +21,7 @@ const METRICS = {
   cardImpressions: 'Card impressions', cardClicks: 'Card clicks', cardClickRate: 'Card click rate (0–1)',
   cardTeaserImpressions: 'Card teaser impressions', cardTeaserClicks: 'Card teaser clicks',
   cardTeaserClickRate: 'Card teaser click rate (0–1)',
+  impressions: 'Thumbnail impressions', impressionsCtr: 'CTR (native value)',
 };
 const DIMENSIONS = {
   day: 'Date', elapsedVideoTimeRatio: 'Video position (0–1)', insightTrafficSourceType: 'Traffic source',
@@ -27,6 +29,8 @@ const DIMENSIONS = {
   subscribedStatus: 'Subscription status', creatorContentType: 'Content format', ageGroup: 'Age group',
   gender: 'Gender', operatingSystem: 'Operating system', insightPlaybackLocationType: 'Playback location',
   youtubeProduct: 'YouTube product', liveOrOnDemand: 'Live or on demand', sharingService: 'Sharing service',
+  videoId: 'Video ID', uploadsReported: 'Uploads with rows', reportGeneratedAt: 'Report generated (UTC)',
+  capturedAt: 'Imported (UTC)',
 };
 const CHANNEL_REPORTS = {
   traffic: 'Traffic sources', country: 'Countries', device: 'Devices', subscribed: 'Subscription status',
@@ -35,7 +39,7 @@ const CHANNEL_REPORTS = {
   sharing: 'Sharing services', searchTerms: 'YouTube search terms', externalSources: 'External sources',
   suggestedVideos: 'Suggested videos', engagement: 'Additional engagement', cards: 'Cards',
 };
-const REPORTS = { daily: 'Daily history', retention: 'Retention', traffic: 'Traffic sources' };
+const REPORTS = { daily: 'Daily history', retention: 'Retention', traffic: 'Traffic sources', reach: 'Thumbnail reach' };
 const PAGE_SIZE = 100;
 const instances = new WeakMap();
 let instanceNumber = 0;
@@ -118,6 +122,74 @@ export function uploadSeries(rows, key, dimension = 'day') {
   return { points, segments };
 }
 
+// Keep each native video/day CTR intact, without assuming its numeric scale.
+// Channel impressions are additive; CTR is not averaged across videos or dates.
+export function reachRows(bulkReach, videoId = null) {
+  const unique = new Map();
+  for (const row of Array.isArray(bulkReach?.daily) ? bulkReach.daily : []) {
+    if (!row || !safeId(row.videoId) || (videoId && row.videoId !== videoId) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(row.date || '')) continue;
+    const key = `${row.date}:${row.videoId}`;
+    const previous = unique.get(key);
+    const version = `${row.reportGeneratedAt || ''}|${row.capturedAt || ''}`;
+    if (previous && version <= `${previous.reportGeneratedAt || ''}|${previous.capturedAt || ''}`) continue;
+    unique.set(key, {
+      day: row.date, videoId: row.videoId,
+      impressions: numeric(row.impressions) && row.impressions >= 0 ? row.impressions : null,
+      impressionsCtr: numeric(row.impressionsCtr) && row.impressionsCtr >= 0 && row.impressionsCtr <= 100
+        ? row.impressionsCtr : null,
+      reportGeneratedAt: row.reportGeneratedAt ?? null, capturedAt: row.capturedAt ?? null,
+    });
+  }
+  return [...unique.values()].sort((a, b) => a.day.localeCompare(b.day) || a.videoId.localeCompare(b.videoId));
+}
+
+export function reachDailyTotals(bulkReach) {
+  const days = new Map();
+  for (const row of reachRows(bulkReach)) {
+    const day = days.get(row.day) || { day: row.day, impressions: null, uploadsReported: 0 };
+    if (numeric(row.impressions)) day.impressions = (day.impressions ?? 0) + row.impressions;
+    day.uploadsReported++;
+    days.set(row.day, day);
+  }
+  return [...days.values()];
+}
+
+export function reachRowsCsv(bulkReach, videoId = null) {
+  const rows = reachRows(bulkReach, videoId).map(({ day, impressionsCtr, ...row }) => ({
+    date: day, ...row, impressionsCtrNative: impressionsCtr,
+  }));
+  return csvRows(rows, ['date', 'videoId', 'impressions', 'impressionsCtrNative', 'reportGeneratedAt', 'capturedAt']);
+}
+
+function reachEntry(bulkReach, videoId = null) {
+  const rows = videoId ? reachRows(bulkReach, videoId) : reachDailyTotals(bulkReach);
+  return {
+    report: {
+      dateRange: rows.length ? {
+        start: rows[0].day, end: rows.at(-1).day,
+        timezone: bulkReach?.dateRange?.timezone || 'America/Los_Angeles',
+      } : null,
+      rows,
+    },
+  };
+}
+
+function reachNotice(bulkReach, rows, videoId = null) {
+  const hasRows = rows.length > 0;
+  const status = {
+    ready: 'Reports imported', pending: 'Waiting for Google reports', partial: 'Reach collection incomplete',
+    'not-configured': 'Reach reports not started',
+  }[bulkReach?.status] || (bulkReach ? 'Reach reports not ready' : 'Reach reports not collected');
+  return `<div class="ua-report-status" role="status"><strong>${escapeHTML(status)}</strong>
+    ${bulkReach?.checkedAt ? `<span>Last checked ${escapeHTML(stamp(bulkReach.checkedAt))}</span>` : ''}
+    ${numeric(bulkReach?.pendingReports) && bulkReach.pendingReports > 0 ? `<span>${number(bulkReach.pendingReports)} reports waiting to import</span>` : ''}</div>
+    ${hasRows ? `<p class="ua-note">Reported dates: ${escapeHTML(rangeText(reachEntry(bulkReach, videoId).report.dateRange))}. ${videoId ? 'CTR is shown exactly as supplied by Google. Its numeric scale has not yet been verified; no percentage conversion is applied. This is not a thumbnail test result.' : 'Impressions sum the available values for public uploads only. Select an upload below for its native daily CTR.'} Missing dates and values are not filled with zeros.</p>` :
+    `<p class="ua-empty">${videoId ? 'No thumbnail reach rows are stored for this upload.' : 'No thumbnail reach rows are stored yet.'} Google’s first report can take up to 48 hours. A new reporting job can backfill the preceding 30 days; older CTR is not reconstructed.</p>`}
+    ${!videoId && bulkReach?.dateRange ? `<p class="ua-note">Imported report coverage: ${escapeHTML(rangeText(bulkReach.dateRange))}. ${number(bulkReach.availableDates?.length)} daily reports imported, including reports with no public upload rows.</p>` : ''}
+    ${hasRows && bulkReach?.status !== 'ready' ? '<p class="ua-note">Available reports keep their original dates while later reports are pending or unavailable.</p>' : ''}`;
+}
+
 function statusText(entry) {
   const statuses = {
     collected: 'Collected', 'no-rows': 'No rows returned', failed: 'Report unavailable',
@@ -183,7 +255,7 @@ function saveFile(filename, contents, type) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function mountUploadAnalytics(container, { uploadAnalytics = null, channelBreakdowns = null } = {}) {
+export function mountUploadAnalytics(container, { uploadAnalytics = null, channelBreakdowns = null, bulkReach = null } = {}) {
   if (!container) return;
   instances.get(container)?.abort();
   const abort = new AbortController();
@@ -193,7 +265,7 @@ export function mountUploadAnalytics(container, { uploadAnalytics = null, channe
   const availableChannel = Object.fromEntries(Object.entries(CHANNEL_REPORTS).filter(([key]) => channelBreakdowns?.[key]));
   const state = {
     search: '', format: 'all', sort: 'views', selected: null, report: 'daily', metric: 'views', page: 0,
-    channel: Object.keys(availableChannel)[0] || '', channelMetric: 'views', channelPage: 0,
+    channel: Object.keys(availableChannel)[0] || '', channelMetric: 'views', channelPage: 0, reachPage: 0,
   };
   const $ = selector => container.querySelector(selector);
   function refreshSelects(target = container) { globalThis.SPSelect?.refresh(target); }
@@ -208,6 +280,10 @@ export function mountUploadAnalytics(container, { uploadAnalytics = null, channe
     <p class="ua-note">Search public uploads, compare native period totals and open each report’s full returned history.</p></div>
     <div class="ua-actions"><button class="button secondary" type="button" data-action="json">All reports JSON</button>
     <button class="button secondary" type="button" data-action="totals-csv" ${videos.length ? '' : 'disabled'}>All upload totals CSV</button></div></div>
+    <section class="ua-reach" aria-labelledby="${prefix}-reach-heading"><div class="ua-heading">
+    <div><p class="eyebrow">YouTube Reporting API</p><h3 id="${prefix}-reach-heading">Thumbnail reach</h3></div>
+    <button class="button secondary" type="button" data-action="reach-csv" ${reachRows(bulkReach).length ? '' : 'disabled'}>Reach rows CSV</button></div>
+    <div data-slot="reach"></div></section>
     ${videos.length ? `<div class="ua-coverage"><strong>${videos.length} verified public uploads</strong>
     <span>${coverage?.inventoryComplete ? 'Inventory matches the channel’s public upload count at capture.' :
       `Partial inventory${numeric(coverage?.channelPublicVideoCount) ? ` · channel reports ${coverage.channelPublicVideoCount} public uploads` : ' · native channel count unavailable'}.`}</span>
@@ -230,9 +306,9 @@ export function mountUploadAnalytics(container, { uploadAnalytics = null, channe
       <thead><tr><th scope="col">Upload</th><th scope="col">Format</th><th scope="col">Views</th><th scope="col">Engaged views</th><th scope="col">Watch time<br>(minutes)</th><th scope="col">Report dates / status</th></tr></thead>
       <tbody>${filtered.map(video => {
         const totals = rowsOf(video.aggregate)[0] || {};
-        const image = thumbnail(video);
+        const image = youtubeThumbnailPreview(thumbnail(video), video.id);
         return `<tr${video.id === state.selected ? ' class="ua-selected"' : ''}><th scope="row"><button type="button" class="ua-video" data-action="video" data-id="${escapeHTML(video.id)}" aria-pressed="${video.id === state.selected}">
-          ${image ? `<img src="${escapeHTML(image)}" alt="" loading="lazy">` : ''}<span>${escapeHTML(video.title)}<small>Published ${escapeHTML(video.publishedAt?.slice(0, 10))} · ${escapeHTML(video.id)}</small></span></button></th>
+          ${image ? `<img src="${escapeHTML(image)}" data-youtube-video="${escapeHTML(video.id)}" alt="" loading="lazy">` : ''}<span>${escapeHTML(video.title)}<small>Published ${escapeHTML(video.publishedAt?.slice(0, 10))} · ${escapeHTML(video.id)}</small></span></button></th>
           <td>${escapeHTML(FORMATS[video.creatorContentType] || 'Unclassified')}</td><td>${number(totals.views)}</td><td>${number(totals.engagedViews)}</td><td>${number(totals.estimatedMinutesWatched)}</td>
           <td><span>${escapeHTML(statusText(video.aggregate))}</span><small>${escapeHTML(rangeText(video.aggregate?.report?.dateRange))}</small></td></tr>`;
       }).join('')}</tbody></table></div>` : '<p class="ua-empty">No uploads match these filters.</p>';
@@ -245,7 +321,7 @@ export function mountUploadAnalytics(container, { uploadAnalytics = null, channe
       ${(video.metadataHistory || []).length ? `<h4>Saved observations (${video.metadataHistory.length})</h4>${video.metadataHistory.map(item => {
         const image = thumbnail({ ...video, thumbnail: item.thumbnail });
         return `<details><summary>${escapeHTML(stamp(item.capturedAt))} · ${escapeHTML(item.title)}</summary>
-        ${image ? `<img class="ua-history-thumbnail" src="${escapeHTML(image)}" alt="Image from the stored thumbnail URL" loading="lazy"><p class="ua-note">This is the stored YouTube thumbnail URL. YouTube can update its image; it is not an archived image file.</p>` : ''}
+        ${image ? `<img class="ua-history-thumbnail" data-archived-thumbnail src="${escapeHTML(image)}" alt="Image from the stored thumbnail URL" loading="lazy"><p class="ua-note">This is the stored YouTube thumbnail URL. YouTube can update its image; it is not an archived image file.</p>` : ''}
         <p class="ua-description">${escapeHTML(item.description)}</p>
         <p>Tags: ${escapeHTML((item.tags || []).join(' · ') || 'No tags returned')}</p></details>`;
       }).join('')}` : '<p class="ua-note">No earlier packaging observations are stored.</p>'}
@@ -272,17 +348,31 @@ export function mountUploadAnalytics(container, { uploadAnalytics = null, channe
   function renderReport() {
     const video = current();
     if (!video) return;
-    const entry = video[state.report], rows = rowsOf(entry);
+    const isReach = state.report === 'reach';
+    const entry = isReach ? reachEntry(bulkReach, video.id) : video[state.report], rows = rowsOf(entry);
     const metrics = Object.keys(rows[0] || {}).filter(key => Object.hasOwn(METRICS, key));
     if (!metrics.includes(state.metric)) state.metric = metrics[0] || 'views';
     const select = $('[data-action="metric"]');
     select.innerHTML = options(Object.fromEntries(metrics.map(key => [key, label(key)])), state.metric);
     select.disabled = !metrics.length;
     $('[data-slot="metric-label"]').hidden = state.report === 'traffic';
-    $('[data-slot="report"]').innerHTML = `${reportNotice(entry)}
+    $('[data-slot="report"]').innerHTML = `${isReach ? reachNotice(bulkReach, rows, video.id) : reportNotice(entry)}
       ${rows.length && state.report !== 'traffic' ? chart(entry, state.metric, state.report === 'retention' ? 'elapsedVideoTimeRatio' : 'day') : ''}
       ${rowTable(entry, state.page, 'video')}`;
     refreshSelects(select);
+  }
+  function renderReach() {
+    const entry = reachEntry(bulkReach), rows = rowsOf(entry);
+    const nativeRows = reachRows(bulkReach);
+    const uploads = new Set(nativeRows.map(row => row.videoId)).size;
+    const impressions = rows.map(row => row.impressions).filter(numeric);
+    $('[data-slot="reach"]').innerHTML = `${reachNotice(bulkReach, rows)}
+      ${rows.length ? `<dl class="ua-metrics ua-reach-metrics">
+      <div><dt>Reported thumbnail impressions</dt><dd>${number(impressions.length ? impressions.reduce((total, value) => total + value, 0) : null)}</dd></div>
+      <div><dt>Public uploads with reach rows</dt><dd>${number(uploads)}</dd></div>
+      <div><dt>Dates with public reach rows</dt><dd>${number(rows.length)}</dd></div></dl>
+      ${chart(entry, 'impressions')}
+      <details class="ua-reach-table"><summary>Daily impressions and coverage</summary>${rowTable(entry, state.reachPage, 'reach')}</details>` : ''}`;
   }
   function renderChannel() {
     const host = $('[data-slot="channel"]');
@@ -317,20 +407,24 @@ export function mountUploadAnalytics(container, { uploadAnalytics = null, channe
       renderCatalog(); renderDetail(); $('[data-slot="video-heading"]')?.focus();
     }
     if (action === 'page') {
-      const field = button.dataset.kind === 'channel' ? 'channelPage' : 'page';
+      const field = button.dataset.kind === 'channel' ? 'channelPage' : button.dataset.kind === 'reach' ? 'reachPage' : 'page';
       state[field] = Math.max(0, state[field] + Number(button.dataset.step));
-      if (field === 'page') renderReport(); else renderChannel();
-      $(`[data-slot="${field === 'page' ? 'report' : 'channel'}"] .ua-table-scroll`)?.focus();
+      if (field === 'page') renderReport(); else if (field === 'reachPage') {
+        renderReach(); $('[data-slot="reach"] details').open = true;
+      } else renderChannel();
+      $(`[data-slot="${field === 'page' ? 'report' : field === 'reachPage' ? 'reach' : 'channel'}"] .ua-table-scroll`)?.focus();
     }
     const video = current();
     if (action === 'json') saveFile('scran-pints-upload-reports.json',
-      JSON.stringify({ exportedAt: new Date().toISOString(), uploadAnalytics, channelBreakdowns }, null, 2), 'application/json');
+      JSON.stringify({ exportedAt: new Date().toISOString(), uploadAnalytics, channelBreakdowns, bulkReach }, null, 2), 'application/json');
     if (action === 'totals-csv') saveFile('scran-pints-all-upload-totals.csv', uploadTotalsCsv(videos), 'text/csv;charset=utf-8');
     if (action === 'report-csv' && video) saveFile(`scran-pints-${video.id}-${state.report}.csv`,
-      reportRowsCsv(video[state.report], { videoId: video.id, title: video.title, reportType: state.report }), 'text/csv;charset=utf-8');
+      state.report === 'reach' ? reachRowsCsv(bulkReach, video.id) :
+        reportRowsCsv(video[state.report], { videoId: video.id, title: video.title, reportType: state.report }), 'text/csv;charset=utf-8');
+    if (action === 'reach-csv') saveFile('scran-pints-thumbnail-reach.csv', reachRowsCsv(bulkReach), 'text/csv;charset=utf-8');
     if (action === 'channel-csv') saveFile(`scran-pints-channel-${state.channel}.csv`,
       reportRowsCsv(channelBreakdowns[state.channel], { reportType: state.channel }), 'text/csv;charset=utf-8');
   }, { signal: abort.signal });
-  renderCatalog(); renderChannel(); refreshSelects();
+  renderCatalog(); renderChannel(); renderReach(); refreshSelects();
   return () => { abort.abort(); if (instances.get(container) === abort) instances.delete(container); };
 }
