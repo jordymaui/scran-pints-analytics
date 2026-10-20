@@ -5,14 +5,15 @@ import { pathToFileURL } from 'node:url';
 import { buildPublicOutput, PUBLIC_OUTPUT } from './build.mjs';
 import privateHandler from '../api/private.mjs';
 import workshopData from '../api/workshop-data.mjs';
-import login from '../api/auth/login.mjs';
-import callback from '../api/auth/callback.mjs';
-import logout from '../api/auth/logout.mjs';
-import session from '../api/auth/session.mjs';
+import auth from '../api/auth/[action].mjs';
+import { AUTH_ACTIONS } from '../lib/auth-routes.mjs';
 import report from '../api/report.mjs';
 import connectionStatus from '../api/connection-status.mjs';
 import workshopNotebook from '../api/workshop-notebook.mjs';
 import youtubeConnection from '../api/connections/youtube.mjs';
+import instagramConnection from '../api/connections/instagram.mjs';
+import tiktokConnection from '../api/connections/tiktok.mjs';
+import publicSocialRefresh from '../api/public-social-refresh.mjs';
 import sync from '../api/sync.mjs';
 import publicRefresh from '../api/public-refresh.mjs';
 import { json } from '../lib/auth.mjs';
@@ -20,12 +21,13 @@ import { PRIVATE_PAGES } from '../lib/private-files.mjs';
 
 const apiRoutes = new Map([
   ['/api/private', privateHandler], ['/api/workshop-data', workshopData],
-  ['/api/auth/login', login], ['/api/auth/callback', callback],
-  ['/api/auth/logout', logout], ['/api/auth/session', session],
+  ...AUTH_ACTIONS.map(action => [`/api/auth/${action}`, auth]),
   ['/api/report', report], ['/api/connection-status', connectionStatus],
   ['/api/workshop-notebook', workshopNotebook], ['/api/connections/youtube', youtubeConnection],
   ['/api/sync', sync],
   ['/api/public-refresh', publicRefresh],
+  ['/api/public-social-refresh', publicSocialRefresh],
+  ['/api/connections/instagram', instagramConnection], ['/api/connections/tiktok', tiktokConnection],
 ]);
 export const PRIVATE_ROOT_FILES = new Set([
   ...PRIVATE_PAGES, 'data.json', 'image-index.json', 'image-assets.js',

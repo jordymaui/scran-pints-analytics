@@ -60,3 +60,29 @@ test('audience groups add native percentages without normalising withheld groups
   assert.deepEqual(plain(context.audienceGroups(rows, 'ageGroup')), [{ key: 'age18-24', value: 30 }, { key: 'age25-34', value: 40 }]);
   assert.deepEqual(plain(context.audienceGroups(rows, 'gender')), [{ key: 'male', value: 60 }, { key: 'female', value: 10 }]);
 });
+
+test('sponsor platform summaries include each social account once and exclude the Shorts subset', () => {
+  const sources = context.sponsorSources({ sources: [
+    { id: 'youtube-longform', metrics: { views: 100 } }, { id: 'youtube-shorts', metrics: { views: 80 } },
+    { id: 'instagram', metrics: { views: 40 } }, { id: 'tiktok', metrics: { views: 30 } },
+  ] });
+  assert.deepEqual(plain(sources.map(item => item.id)), ['youtube-longform', 'instagram', 'tiktok']);
+  assert.equal(sources.reduce((sum, item) => sum + item.source.metrics.views, 0), 170);
+});
+
+test('social daily account activity stays separate from lifetime media totals', () => {
+  const result = context.sourcePerformance({ id: 'instagram', status: 'snapshot', metrics: { views: 9000 },
+    dateRange: { start: '2026-10-01', end: '2026-10-03', timezone: 'UTC' },
+    daily: [{ day: '2026-10-01', views: 5 }, { day: '2026-10-03', views: 7 }] });
+  assert.deepEqual(plain(result.totals), {});
+  assert.deepEqual(plain(result.daily.map(row => row.views)), [5, 7]);
+  assert.equal(result.daily[0].watchHours, null);
+  assert.equal(result.daily.some(row => row.date === '2026-10-02'), false);
+  assert.equal(context.sourcePerformance({ id: 'tiktok', metrics: { views: 9000 }, daily: [] }), null);
+});
+
+test('Instagram audience percentages use their own returned follower-count denominator', () => {
+  const shares = context.audienceShares([{ label: 'GB', count: 60 }, { label: 'US', count: 20 }]);
+  assert.deepEqual(plain(shares), [{ label: 'GB', count: 60, share: 75 }, { label: 'US', count: 20, share: 25 }]);
+  assert.deepEqual(plain(context.audienceShares([{ label: 'GB', count: 0 }])), []);
+});

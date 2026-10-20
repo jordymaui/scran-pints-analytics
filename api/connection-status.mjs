@@ -1,6 +1,8 @@
 import { json } from '../lib/auth.mjs';
 import { createCloudStore, CLOUD_SOURCES } from '../lib/cloud-store.mjs';
 import { youtubeOAuthConfig } from '../lib/youtube-oauth.mjs';
+import { instagramOAuthConfig } from '../lib/instagram-oauth.mjs';
+import { tiktokOAuthConfig } from '../lib/tiktok-oauth.mjs';
 
 const STATUSES = new Set(['ready', 'not-connected', 'blocked', 'failed', 'busy']);
 const ERRORS = new Set(['authorization', 'not-connected', 'not-configured', 'blocked', 'configuration',
@@ -34,6 +36,8 @@ export function createConnectionStatusHandler({
     }
     const setup = { youtubeOAuth: false, youtubePublic: Boolean(env.YOUTUBE_PUBLIC_API_KEY), tiktokOAuth: false, instagramOAuth: false };
     try { oauthConfig(env); setup.youtubeOAuth = true; } catch { /* Setup remains unavailable. */ }
+    try { instagramOAuthConfig(env); setup.instagramOAuth = true; } catch { /* Setup remains unavailable. */ }
+    try { tiktokOAuthConfig(env); setup.tiktokOAuth = true; } catch { /* Setup remains unavailable. */ }
     try {
       return json(res, 200, { configured: true, setup, platforms: publicConnectionStatuses(await storeFactory().getStatuses()) });
     } catch (error) {
