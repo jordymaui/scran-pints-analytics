@@ -21,7 +21,7 @@ const METRICS = {
   cardImpressions: 'Card impressions', cardClicks: 'Card clicks', cardClickRate: 'Card click rate (0–1)',
   cardTeaserImpressions: 'Card teaser impressions', cardTeaserClicks: 'Card teaser clicks',
   cardTeaserClickRate: 'Card teaser click rate (0–1)',
-  impressions: 'Thumbnail impressions', impressionsCtr: 'CTR (native value)',
+  impressions: 'Thumbnail impressions', impressionsCtr: 'Impressions CTR (%)',
 };
 const DIMENSIONS = {
   day: 'Date', elapsedVideoTimeRatio: 'Video position (0–1)', insightTrafficSourceType: 'Traffic source',
@@ -44,6 +44,8 @@ const PAGE_SIZE = 100;
 const instances = new WeakMap();
 let instanceNumber = 0;
 const label = key => METRICS[key] || DIMENSIONS[key] || key;
+export const formatUploadMetric = (key, value) =>
+  key === 'impressionsCtr' && numeric(value) ? `${number(value * 100)}%` : number(value);
 const stamp = value => value ? String(value).replace('T', ' ').replace(/\.\d+Z$/, ' UTC').replace(/Z$/, ' UTC') : 'Not recorded';
 const rangeText = range => range?.start && range?.end
   ? `${range.start} to ${range.end} · ${range.timezone || 'America/Los_Angeles'}` : 'Reporting dates unavailable';
@@ -122,7 +124,7 @@ export function uploadSeries(rows, key, dimension = 'day') {
   return { points, segments };
 }
 
-// Keep each native video/day CTR intact, without assuming its numeric scale.
+// Keep each native video/day CTR ratio intact; convert only its displayed value.
 // Channel impressions are additive; CTR is not averaged across videos or dates.
 export function reachRows(bulkReach, videoId = null) {
   const unique = new Map();
@@ -136,7 +138,7 @@ export function reachRows(bulkReach, videoId = null) {
     unique.set(key, {
       day: row.date, videoId: row.videoId,
       impressions: numeric(row.impressions) && row.impressions >= 0 ? row.impressions : null,
-      impressionsCtr: numeric(row.impressionsCtr) && row.impressionsCtr >= 0 && row.impressionsCtr <= 100
+      impressionsCtr: numeric(row.impressionsCtr) && row.impressionsCtr >= 0 && row.impressionsCtr <= 1
         ? row.impressionsCtr : null,
       reportGeneratedAt: row.reportGeneratedAt ?? null, capturedAt: row.capturedAt ?? null,
     });
@@ -157,9 +159,9 @@ export function reachDailyTotals(bulkReach) {
 
 export function reachRowsCsv(bulkReach, videoId = null) {
   const rows = reachRows(bulkReach, videoId).map(({ day, impressionsCtr, ...row }) => ({
-    date: day, ...row, impressionsCtrNative: impressionsCtr,
+    date: day, ...row, impressionsCtrRatio: impressionsCtr,
   }));
-  return csvRows(rows, ['date', 'videoId', 'impressions', 'impressionsCtrNative', 'reportGeneratedAt', 'capturedAt']);
+  return csvRows(rows, ['date', 'videoId', 'impressions', 'impressionsCtrRatio', 'reportGeneratedAt', 'capturedAt']);
 }
 
 function reachEntry(bulkReach, videoId = null) {
@@ -184,7 +186,7 @@ function reachNotice(bulkReach, rows, videoId = null) {
   return `<div class="ua-report-status" role="status"><strong>${escapeHTML(status)}</strong>
     ${bulkReach?.checkedAt ? `<span>Last checked ${escapeHTML(stamp(bulkReach.checkedAt))}</span>` : ''}
     ${numeric(bulkReach?.pendingReports) && bulkReach.pendingReports > 0 ? `<span>${number(bulkReach.pendingReports)} reports waiting to import</span>` : ''}</div>
-    ${hasRows ? `<p class="ua-note">Reported dates: ${escapeHTML(rangeText(reachEntry(bulkReach, videoId).report.dateRange))}. ${videoId ? 'CTR is shown exactly as supplied by Google. Its numeric scale has not yet been verified; no percentage conversion is applied. This is not a thumbnail test result.' : 'Impressions sum the available values for public uploads only. Select an upload below for its native daily CTR.'} Missing dates and values are not filled with zeros.</p>` :
+    ${hasRows ? `<p class="ua-note">Reported dates: ${escapeHTML(rangeText(reachEntry(bulkReach, videoId).report.dateRange))}. ${videoId ? 'CTR is Google’s daily ratio shown as a percentage. CSV and JSON retain the native ratio. This is not a thumbnail test result.' : 'Impressions sum the available values for public uploads only. Select an upload below for its daily CTR.'} Missing dates and values are not filled with zeros.</p>` :
     `<p class="ua-empty">${videoId ? 'No thumbnail reach rows are stored for this upload.' : 'No thumbnail reach rows are stored yet.'} Google’s first report can take up to 48 hours. A new reporting job can backfill the preceding 30 days; older CTR is not reconstructed.</p>`}
     ${!videoId && bulkReach?.dateRange ? `<p class="ua-note">Imported report coverage: ${escapeHTML(rangeText(bulkReach.dateRange))}. ${number(bulkReach.availableDates?.length)} daily reports imported, including reports with no public upload rows.</p>` : ''}
     ${hasRows && bulkReach?.status !== 'ready' ? '<p class="ua-note">Available reports keep their original dates while later reports are pending or unavailable.</p>' : ''}`;
@@ -220,9 +222,9 @@ function chart(entry, metric, dimension = 'day') {
   const ticks = [0, 0.5, 1].map(part => maximum - span * part);
   const xLabel = point => dimension === 'day' ? point.source : `${number(point.source * 100)}%`;
   return `<svg class="ua-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeHTML(label(metric))} ${dimension === 'day' ? 'by date' : 'by position in video'}. ${points.length} returned rows; exact values in the table below.">
-    ${ticks.map(value => `<line x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text x="${left - 12}" y="${y(value) + 4}" text-anchor="end">${escapeHTML(number(value))}</text>`).join('')}
+    ${ticks.map(value => `<line x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}"/><text x="${left - 12}" y="${y(value) + 4}" text-anchor="end">${escapeHTML(formatUploadMetric(metric, value))}</text>`).join('')}
     ${segments.map(segment => `<polyline points="${segment.map(point => `${x(point.x)},${y(point.y)}`).join(' ')}"/>`).join('')}
-    ${points.map(point => `<circle cx="${x(point.x)}" cy="${y(point.y)}" r="${points.length > 150 ? 2 : 3}"><title>${escapeHTML(xLabel(point))}: ${escapeHTML(number(point.y))}</title></circle>`).join('')}
+    ${points.map(point => `<circle cx="${x(point.x)}" cy="${y(point.y)}" r="${points.length > 150 ? 2 : 3}"><title>${escapeHTML(xLabel(point))}: ${escapeHTML(formatUploadMetric(metric, point.y))}</title></circle>`).join('')}
     <text x="${left}" y="${height - 13}">${escapeHTML(xLabel(points[0]))}</text>
     ${points.length > 1 ? `<text x="${width - right}" y="${height - 13}" text-anchor="end">${escapeHTML(xLabel(points.at(-1)))}</text>` : ''}
     </svg><p class="ua-note">${points.length} returned ${dimension === 'day' ? 'days. Gaps remain gaps' : 'video positions'}. Exact native values follow.</p>`;
@@ -239,7 +241,7 @@ function rowTable(entry, page, kind) {
     <table><caption class="ua-sr-only">Native report rows · ${escapeHTML(rangeText(entry.report.dateRange))}</caption>
     <thead><tr>${columns.map(key => `<th scope="col">${escapeHTML(label(key))}</th>`).join('')}</tr></thead>
     <tbody>${selected.map(row => `<tr>${columns.map((key, index) =>
-      `<${index ? 'td' : 'th scope="row"'}>${escapeHTML(numeric(row[key]) ? number(row[key]) : row[key] ?? 'Unavailable')}</${index ? 'td' : 'th'}>`).join('')}</tr>`).join('')}</tbody></table></div>
+      `<${index ? 'td' : 'th scope="row"'}>${escapeHTML(numeric(row[key]) ? formatUploadMetric(key, row[key]) : row[key] ?? 'Unavailable')}</${index ? 'td' : 'th'}>`).join('')}</tr>`).join('')}</tbody></table></div>
     <div class="ua-pagination"><span>Rows ${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, rows.length)} of ${rows.length}</span>
     ${pages > 1 ? `<button class="button secondary" type="button" data-action="page" data-kind="${kind}" data-step="-1" ${page === 0 ? 'disabled' : ''}>Previous rows</button>
     <button class="button secondary" type="button" data-action="page" data-kind="${kind}" data-step="1" ${page === pages - 1 ? 'disabled' : ''}>Next rows</button>` : ''}

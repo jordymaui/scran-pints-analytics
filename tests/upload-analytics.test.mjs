@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   filterUploads, reportRowsCsv, uploadTotalsCsv, uploadSeries, reachRows, reachDailyTotals,
-  reachRowsCsv, mountUploadAnalytics,
+  reachRowsCsv, mountUploadAnalytics, formatUploadMetric,
 } from '../upload-analytics.js';
 
 const report = rows => ({
@@ -70,7 +70,7 @@ const reachRow = (date, videoId, impressions, impressionsCtr, generated = '2026-
 test('reach sums available impressions without averaging CTR, filling gaps or counting replaced reports twice', () => {
   const bulk = { daily: [
     reachRow('2026-10-17', 'aBcDeFgHi12', 100, 0.034),
-    reachRow('2026-10-17', 'aBcDeFgHi12', 120, 3.5, '2026-10-20T10:00:00Z'),
+    reachRow('2026-10-17', 'aBcDeFgHi12', 120, 0.035, '2026-10-20T10:00:00Z'),
     reachRow('2026-10-17', 'bBcDeFgHi12', 80, 0),
     reachRow('2026-10-19', 'aBcDeFgHi12', null, null),
     reachRow('2026-10-20', 'aBcDeFgHi12', 0, 0),
@@ -80,7 +80,7 @@ test('reach sums available impressions without averaging CTR, filling gaps or co
     { day: '2026-10-19', impressions: null, uploadsReported: 1 },
     { day: '2026-10-20', impressions: 0, uploadsReported: 1 },
   ]);
-  assert.deepEqual(reachRows(bulk, 'aBcDeFgHi12').map(row => row.impressionsCtr), [3.5, null, 0]);
+  assert.deepEqual(reachRows(bulk, 'aBcDeFgHi12').map(row => row.impressionsCtr), [0.035, null, 0]);
   assert.equal(bulk.daily[0].impressions, 100);
   assert.deepEqual(uploadSeries(reachDailyTotals(bulk), 'impressions').segments.map(segment => segment.map(row => row.y)), [[200], [0]]);
 });
@@ -88,12 +88,29 @@ test('reach sums available impressions without averaging CTR, filling gaps or co
 test('reach CSV preserves native CTR values and each report generation/import date', () => {
   const csv = reachRowsCsv({ daily: [
     reachRow('2026-10-17', 'aBcDeFgHi12', 100, 0.034),
-    reachRow('2026-10-18', 'bBcDeFgHi12', 50, 3.4),
+    reachRow('2026-10-18', 'bBcDeFgHi12', 50, 0.034),
   ] }, 'aBcDeFgHi12');
-  assert.match(csv, /"impressionsCtrNative"/);
+  assert.match(csv, /"impressionsCtrRatio"/);
   assert.match(csv, /"100","0\.034","2026-10-19T10:00:00Z","2026-10-20T12:00:00Z"/);
   assert.equal(csv.split('\r\n').length, 2);
   assert.doesNotMatch(csv, /bBcDeFgHi12/);
+});
+
+test('verified Reporting API CTR ratios display as percentages without changing native exports', () => {
+  const rows = [
+    reachRow('2026-10-16', 'CWBBRExPJ0I', 50, 0.06),
+    reachRow('2026-10-17', 'CWBBRExPJ0I', 32, 0.15625),
+    reachRow('2026-10-18', 'CWBBRExPJ0I', 47, 0.1276595744680851),
+  ];
+  assert.deepEqual(rows.map(row => formatUploadMetric('impressionsCtr', row.impressionsCtr)), ['6%', '15.625%', '12.766%']);
+  assert.equal(formatUploadMetric('impressionsCtr', 0), '0%');
+  assert.equal(formatUploadMetric('impressionsCtr', null), 'Unavailable');
+  assert.equal(formatUploadMetric('impressions', 50), '50');
+  const csv = reachRowsCsv({ daily: rows });
+  assert.match(csv, /"50","0\.06"/);
+  assert.match(csv, /"32","0\.15625"/);
+  assert.match(csv, /"47","0\.1276595744680851"/);
+  assert.doesNotMatch(csv, /%/);
 });
 
 test('pending reach is visible without invented metrics, and saved dates stay distinct from latest check', () => {
