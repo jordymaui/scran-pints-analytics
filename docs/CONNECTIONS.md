@@ -13,6 +13,14 @@ Official references: [Meta Instagram Login](https://developers.facebook.com/docs
 
 The owner reports existing YouTube API access and has Viewstats Pro. The inspected main site's Google configuration supports identity sign-in; no YouTube reporting OAuth grant was found there. Reuse an existing Google project if available, then supply or obtain the actual channel authorization. Instagram and TikTok application setup starts from scratch. A signed-in browser or a Pro browser extension is not evidence that a server has API access.
 
+## TikTok Studio imports
+
+TikTok Studio supplements the connected Display API with separately dated reports. From Studio's Overview, Followers and Viewers tabs, choose the required period and download CSV. Extract the ZIP files and select `Overview.csv`, `FollowerHistory.csv` and `Viewers.csv` in Connections. `FollowerGender.csv` and `FollowerTopTerritories.csv` add follower demographics. Confirm the exact date windows shown by each report: exported day/month labels omit the year, and Overview/Followers can finish on a different date from Viewers.
+
+Connections parses and previews the CSV files in the browser. Only a validated, selected report is sent to authenticated `POST /api/sync?source=tiktok` with operation `studio-import`; raw CSV files are not published. Native percentages and source dates are retained. Missing or `undefined` cells stay unavailable. Daily viewers are not summed into period unique viewers, and reported follower changes are not recalculated from follower stocks.
+
+The Studio supplement is stored inside the existing private TikTok snapshot, under the same collection lease. Updating it preserves the Display API counters and their original collection timestamp. Subsequent API refreshes preserve the supplement, and the existing snapshot archive retains prior versions. Public Refresh updates the connected API counters; it does not fetch a fresh Studio export. Screen-captured Studio audience or traffic summaries retain their own dates and provenance.
+
 ## Connect and refresh online
 
 1. Provision the private tables and functions from `supabase/provision.sql` in the existing Supabase project. Set the server environment in the existing Vercel project, using `.env.example` and the deployment documentation. Keep the Supabase server secret separate from the publishable Auth key.

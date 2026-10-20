@@ -15,6 +15,7 @@
 @media print{.sidebar,.toolbar,.top-actions,.page-footer,.coverage-details,.chart-controls,.text-button{display:none}.app{margin:0}.topbar{border:0}main{padding:0}.metric-grid{grid-template-columns:repeat(7,1fr)}.metric{padding:8px}.metric-value{font-size:28px}.chart-panel{break-inside:avoid}.lower-grid{grid-template-columns:1.5fr 1fr}.panel{break-inside:avoid}.chart-tooltip{display:none}}
 @media(max-width:540px){#export-report{font-size:0;gap:0;min-width:38px;justify-content:center}#export-report svg{width:16px;height:16px}.toolbar-group:last-child{flex-wrap:nowrap}}
 @media(max-width:380px){.sidebar .nav-item svg{display:none}.sidebar .nav-item{font-size:14px;padding:10px 8px}.sidebar nav{gap:2px}.engagement-chart{gap:20px;padding:16px}.legend-list{min-width:85px}}
+.dashboard-studio-notice{font-size:14px;line-height:1.65}.dashboard-studio-notice>b{display:block;font-size:15px;margin-bottom:4px}.dashboard-studio-notice p+p{margin-top:5px}
 @media(max-width:540px){.top-actions .studio-shortcut{display:none}.top-actions{gap:8px}}
 
 /* Official white YEET mark, displayed on its approved dark background. */

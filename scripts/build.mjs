@@ -22,6 +22,7 @@ export const PUBLIC_FILES = Object.freeze([
   'privacy.html', 'terms.html', 'notice.css',
   'tiktokppn2P5Ler3fSSZQl38BwTa98y3fnkLNF.txt',
   'lib/report-model.mjs', 'lib/workshop-model.mjs', 'lib/dashboard-metrics.mjs',
+  'lib/tiktok-studio.mjs',
   'assets/scran-pints-logo.png', 'assets/optimized/3f526c1560f0-480.webp',
 ]);
 async function safeSource(name) {
