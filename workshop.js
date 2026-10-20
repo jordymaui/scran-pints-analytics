@@ -23,6 +23,28 @@ let notebookNeedsReload = false;
 let notebookDirty = false;
 let formBaseline = '';
 let windowDays = 3;
+let teamAccess = false;
+let studioReady = false;
+let notebookBound = false;
+
+function updateTeamControls() {
+  document.body.classList.toggle('team-access', teamAccess);
+  $('#team-sign-out').hidden = !teamAccess;
+  $('#team-controls-link').hidden = teamAccess;
+  if (studioReady && teamAccess && !notebookBound) {
+    notebookBound = true;
+    bindNotebook();
+    loadNotebook();
+    if (location.hash === '#notebook') selectStudioSection('notebook', false);
+  }
+}
+async function checkTeamAccess() {
+  try {
+    const response = await fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' });
+    teamAccess = response.ok && (await response.json()).authenticated === true;
+  } catch { teamAccess = false; }
+  updateTeamControls();
+}
 
 function download(filename, contents, type) {
   const url = URL.createObjectURL(new Blob([contents], { type }));
@@ -150,11 +172,11 @@ function renderChannelBreakdown() {
 function renderShortsAnalytics() {
   const report = data.shortsAnalytics;
   if (!report) {
-    $('#shorts-analytics').innerHTML = '<div class="notice quiet"><strong>No saved private Shorts report is available.</strong><p>Use Refresh private Shorts in Connections after the YouTube reporting grant is saved. No Shorts figures are inferred from the public channel counter or the episode catalog.</p></div>';
+    $('#shorts-analytics').innerHTML = '<div class="notice quiet"><strong>No saved Shorts report is available.</strong><p>Shorts reporting status is available in Connections. No Shorts figures are inferred from the public channel counter or the episode catalog.</p></div>';
     return;
   }
   const fields = [['views', 'Views', 0], ['engagedViews', 'Engaged views', 0], ['watchHours', 'Watch hours', 1], ['likes', 'Likes', 0], ['comments', 'Comments', 0], ['shares', 'Shares', 0], ['subscribersNet', 'Net subscribers', 0]];
-  $('#shorts-analytics').innerHTML = `<article class="analytics-report"><div class="section-heading compact"><h3>YouTube Shorts</h3><span class="pill">Saved private report</span></div><p class="note">${escapeHTML(reportDates(report))}</p>${metricLedger(report.metrics, fields)}<p class="note">Source: ${escapeHTML(report.provenance.label)}. ${escapeHTML(report.scope)}</p><p class="note">Shorts totals sum returned daily Shorts rows. Views and engaged views are separate source metrics. Daily watch time, subscriber gains/losses and individual-Short records are not retained in this saved report.</p><div id="shorts-trend">${analyticsTrend(report.daily, report.dateRange, 'Shorts', 'shorts', 28, true)}</div></article>`;
+  $('#shorts-analytics').innerHTML = `<article class="analytics-report"><div class="section-heading compact"><h3>YouTube Shorts</h3><span class="pill">YouTube Analytics</span></div><p class="note">${escapeHTML(reportDates(report))}</p>${metricLedger(report.metrics, fields)}<p class="note">Source: ${escapeHTML(report.provenance.label)}. ${escapeHTML(report.scope)}</p><p class="note">Shorts totals sum returned daily Shorts rows. Views and engaged views are separate source metrics. Daily watch time, subscriber gains/losses and individual-Short records are not retained in this saved report.</p><div id="shorts-trend">${analyticsTrend(report.daily, report.dateRange, 'Shorts', 'shorts', 28, true)}</div></article>`;
 }
 function episodeAnalyticsRows() {
   const query = $('#analytics-search').value.trim().toLocaleLowerCase();
@@ -209,7 +231,7 @@ function initializeAnalytics() {
         const range = episodeRange(video);
         return [video.id, episodeTitle(video), range.start, range.end, video.analyticsSource?.capturedAt || data.capturedAt, ...analyticsFields.map(field => metrics[field[0]])];
       })];
-    download('scran-pints-private-episode-analytics.csv', rows.map(row => row.map(csvCell).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
+    download('scran-pints-episode-analytics.csv', rows.map(row => row.map(csvCell).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
   });
 }
 
@@ -358,6 +380,7 @@ function applyFormEntry(entry) {
     if (field === 'videoId' && ![...input.options].some(option => option.value === entry.videoId)) input.add(new Option(`Imported episode: ${entry.videoId}`, entry.videoId));
     input.value = entry[field];
   }
+  window.SPSelect?.refresh($('#experiment-form'));
   $('#form-title').textContent = 'Edit team draft';
   formBaseline = JSON.stringify(formValues());
 }
@@ -372,6 +395,7 @@ function notebookResponse(payload) {
   return { ...payload, drafts: validateNotebook({ schema: 'scran-workshop-notebook-v1', entries: payload.drafts }) };
 }
 async function persistNotebook() {
+  if (!teamAccess) return false;
   notebookDirty = true;
   if (notebookBusy) return false;
   if (notebookVersion === null || notebookNeedsReload) {
@@ -408,6 +432,7 @@ async function persistNotebook() {
 }
 
 async function loadNotebook() {
+  if (!teamAccess) return;
   if (notebookBusy) return;
   // Capture unsaved form edits before rebasing, so reloading cannot overwrite
   // another person's changes with a stale form or discard this person's text.
@@ -460,6 +485,7 @@ function newExperiment(videoId) {
   $('#experiment-id').value = '';
   $('#form-title').textContent = 'Plan the next test';
   if (videoId) $('#experiment-video').value = videoId;
+  window.SPSelect?.refresh($('#experiment-form'));
   formBaseline = JSON.stringify(formValues());
   setNotebookStatus('New draft · save to share with the team. Nothing is sent to YouTube.');
 }
@@ -549,7 +575,7 @@ async function importEntries(imported) {
 
 const studioSections = new Set(['analytics', 'compare', 'packaging', 'metadata', 'notebook']);
 function selectStudioSection(requested, updateUrl = true) {
-  const selected = studioSections.has(requested) ? requested : 'analytics';
+  const selected = studioSections.has(requested) && (requested !== 'notebook' || teamAccess) ? requested : 'analytics';
   document.querySelectorAll('[data-studio-panel]').forEach(panel => { panel.hidden = panel.id !== selected; });
   document.querySelectorAll('[data-studio-tab]').forEach(link => {
     if (link.dataset.studioTab === selected) link.setAttribute('aria-current', 'location');
@@ -573,6 +599,7 @@ function initialize() {
   for (const selector of ['#video-a', '#video-b', '#experiment-video']) $(selector).innerHTML = options;
   $('#packaging-video').insertAdjacentHTML('beforeend', options);
   $('#video-b').value = data.videos[Math.min(2, data.videos.length - 1)].id;
+  window.SPSelect?.refresh();
   const sourceText = `Saved reporting evidence · API through ${date(data.apiThrough)} · collected ${date(data.capturedAt)} · historical Studio cards ${date(data.studioCapturedAt)}`;
   $('#source-stamp').textContent = `Through ${date(data.apiThrough)} · Updated ${date(data.capturedAt)}`;
   $('#method-dates').textContent = sourceText;
@@ -582,8 +609,6 @@ function initialize() {
   renderHeadToHead();
   renderPackaging();
   renderMetadata();
-  bindNotebook();
-  loadNotebook();
   document.querySelectorAll('input[name="window"]').forEach(input => input.addEventListener('change', () => {
     windowDays = Number(input.value);
     renderComparison();
@@ -612,6 +637,7 @@ function initialize() {
       if (!group) return;
       newExperiment(group.videoId);
       $('#experiment-change').value = 'Title + thumbnail pairing';
+      window.SPSelect?.refresh($('#experiment-change'));
       $('#experiment-control').value = `${group.episode} / ${group.testId}\n${group.window || 'Exact run dates not recorded'}\nCaptured ${group.observedAt || 'date not recorded'}\n${group.status || group.result || 'No result recorded'}\n${group.variants.map(variant => `${variant.title || 'Title unknown'}: ${percent(variant.metrics?.watchTimeSharePct)} watch-time share`).join('\n')}`;
       $('#experiment-metric').value = 'Native test watch-time share for the whole title/image pairing. Keep the full test dates and final status. Do not infer variant CTR or attribute the result to one element.';
       selectStudioSection('notebook');
@@ -622,7 +648,8 @@ function initialize() {
   $('#close-image').addEventListener('click', () => $('#image-dialog').close());
   $('#image-dialog').addEventListener('click', event => { if (event.target === $('#image-dialog')) $('#image-dialog').close(); });
   initializeStudioNavigation();
-  $('#team-sign-out').hidden = false;
+  studioReady = true;
+  updateTeamControls();
   $('#load-state').hidden = true;
   $('#workshop-content').hidden = false;
 }
@@ -630,11 +657,6 @@ function initialize() {
 async function load() {
   try {
     const response = await fetch('/api/workshop-data', { credentials: 'same-origin', cache: 'no-store' });
-    if (response.status === 401 || response.status === 403) {
-      $('#source-stamp').textContent = 'Sign in to view team analytics';
-      $('#load-state').innerHTML = '<strong>Sign in to Studio</strong><p>Use an authorised team account to open analytics, packaging history and the notebook.</p><p><a class="button" href="/login.html?next=%2Fworkshop.html">Sign in ↗</a></p>';
-      return;
-    }
     if (!response.ok) throw new Error(`The data service returned ${response.status}.`);
     data = await response.json();
     if (!Array.isArray(data.videos) || !data.videos.length) throw new Error('No video records were returned.');
@@ -646,4 +668,5 @@ async function load() {
     $('#retry-load').addEventListener('click', load);
   }
 }
+checkTeamAccess();
 load();

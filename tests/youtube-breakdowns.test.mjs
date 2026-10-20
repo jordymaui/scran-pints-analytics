@@ -135,7 +135,7 @@ test('channel selector renders native demographics, retained dates, empty status
   };
   const context = vm.createContext({ document: { querySelector: element }, Intl, Date, Number, String, Map, Set });
   const source = (await readFile(new URL('../workshop.js', import.meta.url), 'utf8'))
-    .replace(/^import .*;\r?\n/gm, '').replace(/\r?\nload\(\);\s*$/, '');
+    .replace(/^import .*;\r?\n/gm, '').replace(/\r?\ncheckTeamAccess\(\);\r?\nload\(\);\s*$/, '');
   vm.runInContext(source, context);
   const previous = await collectChannelBreakdowns({ ...options, capturedAt: '2026-10-18T12:00:00Z', end: '2026-10-15' });
   context.fixture = { channelBreakdowns: await collectChannelBreakdowns({ ...options, previous,

@@ -74,16 +74,16 @@ test('private channel validation rejects malformed counts, dates, attribution an
   }
 });
 
-test('private endpoint authorizes before loading data and denies unsupported methods', async () => {
+test('public Studio endpoint reads without authorization and denies unsupported methods', async () => {
   let reads = 0, authorizations = 0;
   const handler = createWorkshopDataHandler({
     authorize: async (_req, res) => { authorizations++; res.statusCode = 401; res.end('{"error":"sign_in_required"}'); return null; },
-    loadInputs: async () => { reads++; throw Error('must not run'); },
+    loadInputs: async () => { reads++; return { snapshot: {}, social: { sources: [] }, origins: {} }; },
   });
-  const denied = response(); await handler({ method: 'GET' }, denied);
-  assert.equal(denied.statusCode, 401); assert.equal(reads, 0);
+  const readable = response(); await handler({ method: 'GET' }, readable);
+  assert.equal(readable.statusCode, 200); assert.equal(reads, 1);
   const unsupported = response(); await handler({ method: 'POST' }, unsupported);
-  assert.equal(unsupported.statusCode, 405); assert.equal(authorizations, 1);
+  assert.equal(unsupported.statusCode, 405); assert.equal(authorizations, 0); assert.equal(reads, 1);
 });
 
 test('private endpoint exposes only the validated cloud Shorts source and its original dates', async () => {
@@ -98,7 +98,8 @@ test('private endpoint exposes only the validated cloud Shorts source and its or
     });
     const res = response(); await handler({ method: 'GET' }, res);
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(res.body.channelAnalytics, channel());
+    const { channelId, ...expected } = channel();
+    assert.deepEqual(res.body.channelAnalytics, expected);
     assert.equal(res.body.shortsAnalytics?.capturedAt ?? null, origin === 'cloud' ? shorts().capturedAt : null);
     assert.doesNotMatch(JSON.stringify(res.body), /EXCLUDED_SOCIAL/);
     assert.match(res.headers['Cache-Control'], /no-store/);
@@ -134,7 +135,7 @@ test('overview render uses native channel totals, separate Shorts dates, and dat
     document: { querySelector: element }, Intl, Date, Number, String, Map, Set,
   });
   const source = (await readFile(new URL('../workshop.js', import.meta.url), 'utf8'))
-    .replace(/^import .*;\r?\n/gm, '').replace(/\r?\nload\(\);\s*$/, '');
+    .replace(/^import .*;\r?\n/gm, '').replace(/\r?\n(?:checkTeamAccess|load)\(\);/g, '');
   vm.runInContext(source, context);
   context.fixture = {
     capturedAt: '2026-10-20T12:00:00Z', apiThrough: '2026-10-03', channelAnalytics: channel(), shortsAnalytics: shorts(),
@@ -156,7 +157,7 @@ test('overview render uses native channel totals, separate Shorts dates, and dat
   assert.doesNotMatch([...elements.values()].map(row => row.innerHTML).join(''), /NaN|undefined|Infinity/);
   vm.runInContext('data.channelAnalytics = null; data.shortsAnalytics = null; renderChannelAnalytics(); renderShortsAnalytics();', context);
   assert.match(element('#channel-analytics').innerHTML, /has not been collected yet/);
-  assert.match(element('#shorts-analytics').innerHTML, /No saved private Shorts report/);
+  assert.match(element('#shorts-analytics').innerHTML, /No saved Shorts report/);
 });
 
 test('Studio tabs open deep links and notebook navigation without discarding panel state', async () => {
@@ -177,9 +178,9 @@ test('Studio tabs open deep links and notebook navigation without discarding pan
     Intl, Date, Number, String, Map, Set,
   });
   const source = (await readFile(new URL('../workshop.js', import.meta.url), 'utf8'))
-    .replace(/^import .*;\r?\n/gm, '').replace(/\r?\nload\(\);\s*$/, '');
+    .replace(/^import .*;\r?\n/gm, '').replace(/\r?\n(?:checkTeamAccess|load)\(\);/g, '');
   vm.runInContext(source, context);
-  vm.runInContext('initializeStudioNavigation();', context);
+  vm.runInContext('teamAccess = true; initializeStudioNavigation();', context);
   assert.deepEqual(panels.filter(panel => !panel.hidden).map(panel => panel.id), ['packaging']);
   assert.equal(links[2].attributes['aria-current'], 'location');
   let prevented = false;
@@ -195,4 +196,7 @@ test('Studio tabs open deep links and notebook navigation without discarding pan
   vm.runInContext("selectStudioSection('notebook');", context);
   assert.equal(panels[4].hidden, false);
   assert.equal(panels[4].draftValue, 'unsaved hypothesis');
+  vm.runInContext("teamAccess = false; selectStudioSection('notebook');", context);
+  assert.equal(panels[4].hidden, true);
+  assert.equal(panels[0].hidden, false);
 });

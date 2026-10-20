@@ -4,6 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { resolve, relative } from 'node:path';
 import { startServer, PRIVATE_ROOT_FILES } from '../scripts/serve.mjs';
 import { buildPublicOutput, validateCampaigns, ROOT, PUBLIC_OUTPUT } from '../scripts/build.mjs';
+import { studioThumbnailAssets } from '../lib/studio-projection.mjs';
 
 let server;
 let origin;
@@ -42,12 +43,13 @@ async function filesIn(directory) {
   return result;
 }
 
-test('public build contains the public report and shells, but no archive, evidence or configuration', async () => {
+test('public build contains reviewed Studio thumbnails, but no archive, screenshots or configuration', async () => {
   const files = await filesIn(PUBLIC_OUTPUT);
+  const thumbnails = new Set(studioThumbnailAssets(snapshot));
   for (const expected of ['index.html', 'sponsor.html', 'workshop.html', 'login.html', 'connections.html', 'public-report.json']) assert.ok(files.includes(expected));
   for (const file of files) {
     assert.doesNotMatch(file, /(?:^|\/)(?:\.env|\.git|\.private|api|integrations|tests|scripts)(?:\/|\.|$)/);
-    assert.doesNotMatch(file, /history|evidence|ab-tests|image-index|image-assets/);
+    if (!thumbnails.has(file)) assert.doesNotMatch(file, /history|evidence|ab-tests|image-index|image-assets/);
     assert.equal(PRIVATE_ROOT_FILES.has(file), false, `Private file leaked: ${file}`);
   }
   const report = JSON.parse(await readFile(resolve(PUBLIC_OUTPUT, 'public-report.json'), 'utf8'));
@@ -62,7 +64,7 @@ test('public build contains the public report and shells, but no archive, eviden
 });
 
 test('HTTP public pages, current thumbnail and report remain readable without a session', async () => {
-  for (const path of ['/', '/sponsor.html', '/workshop.html', '/login.html', '/connections.html', '/api/report', '/public-report.json', `/${snapshot.videos[0].thumb}`]) {
+  for (const path of ['/', '/sponsor.html', '/workshop.html', '/login.html', '/connections.html', '/api/report', '/api/workshop-data', '/api/connection-status', '/public-report.json', '/assets/history-CWBBRExPJ0I-p1.jpg', `/${snapshot.videos[0].thumb}`]) {
     const response = await fetch(origin + path);
     assert.equal(response.status, 200, path);
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
@@ -80,7 +82,7 @@ test('HTTP private pages redirect and private data/assets refuse unauthenticated
     assert.match(response.headers.get('location'), /^\/login\.html\?error=/);
     assert.match(response.headers.get('cache-control'), /no-store/);
   }
-  for (const path of ['/data.json', '/api/workshop-data', '/api/connection-status', '/api/workshop-notebook', '/image-index.json', '/image-assets.js', '/app.js', '/assets/history-CWBBRExPJ0I-p1.jpg', '/assets/evidence-nrVntdSPHgg-p2.jpg']) {
+  for (const path of ['/data.json', '/api/workshop-notebook', '/image-index.json', '/image-assets.js', '/app.js', '/assets/evidence-nrVntdSPHgg-p2.jpg']) {
     const response = await fetch(origin + path, { redirect: 'manual' });
     assert.equal(response.status, 401, path);
     assert.equal((await response.json()).error, 'sign_in_required');
@@ -107,9 +109,10 @@ test('HTTP auth methods enforce same-origin POST and missing configuration fails
   const saved = process.env.WORKSHOP_ALLOWED_EMAILS;
   process.env.WORKSHOP_ALLOWED_EMAILS = '';
   try {
-    const denied = await fetch(origin + '/api/workshop-data');
+    const denied = await fetch(origin + '/api/auth/session');
     assert.equal(denied.status, 503);
     assert.equal((await denied.json()).error, 'auth_not_configured');
+    assert.equal((await fetch(origin + '/api/workshop-data')).status, 200);
   } finally { process.env.WORKSHOP_ALLOWED_EMAILS = saved; }
 });
 
