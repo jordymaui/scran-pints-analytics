@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "campaigns": [
+    {
+      "id": "yeet",
+      "name": "YEET",
+      "status": "awaiting-attribution",
+      "description": "Public partnership reporting for Scran & Pints × YEET.",
+      "placements": []
+    }
+  ]
+}

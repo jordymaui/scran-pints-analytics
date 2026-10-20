@@ -5,3 +5,8 @@
 .DS_Store
 node_modules/
 __pycache__/
+public-dist/
+.private/
+integrations/*.lock
+integrations/*.tmp
+/outputs/

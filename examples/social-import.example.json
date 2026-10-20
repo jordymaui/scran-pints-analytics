@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "youtube-shorts",
+      "label": "YouTube Shorts",
+      "accountLabel": "EXAMPLE — replace with the connected account",
+      "status": "snapshot",
+      "capturedAt": "2026-10-20T10:00:00Z",
+      "dateRange": {
+        "start": "2026-10-01",
+        "end": "2026-10-19",
+        "timezone": "America/Los_Angeles"
+      },
+      "scope": "EXAMPLE TEMPLATE ONLY. Replace dates and values with the platform-reported window. Null means unavailable. Account totals and content-level counts must use the same reporting window.",
+      "provenance": {
+        "kind": "platform-export",
+        "label": "EXAMPLE TEMPLATE — replace with the source report name"
+      },
+      "metrics": {
+        "views": null,
+        "engagedViews": null,
+        "watchHours": null,
+        "likes": null,
+        "comments": null,
+        "shares": null,
+        "followers": null,
+        "subscribersNet": null
+      },
+      "daily": [],
+      "content": []
+    },
+    {
+      "id": "instagram",
+      "label": "Instagram",
+      "accountLabel": "EXAMPLE — replace with the connected account",
+      "status": "snapshot",
+      "capturedAt": "2026-10-20T10:00:00Z",
+      "dateRange": {
+        "start": "2026-10-01",
+        "end": "2026-10-19",
+        "timezone": "UTC"
+      },
+      "scope": "EXAMPLE TEMPLATE ONLY. Replace dates and values with the platform-reported window. Null means unavailable. Specify whether views include Reels, feed, Stories, organic or paid.",
+      "provenance": {
+        "kind": "platform-export",
+        "label": "EXAMPLE TEMPLATE — replace with the source report name"
+      },
+      "metrics": {
+        "views": null,
+        "engagedViews": null,
+        "watchHours": null,
+        "likes": null,
+        "comments": null,
+        "shares": null,
+        "followers": null,
+        "subscribersNet": null
+      },
+      "daily": [],
+      "content": []
+    },
+    {
+      "id": "tiktok",
+      "label": "TikTok",
+      "accountLabel": "EXAMPLE — replace with the connected account",
+      "status": "snapshot",
+      "capturedAt": "2026-10-20T10:00:00Z",
+      "dateRange": {
+        "start": "2026-10-01",
+        "end": "2026-10-19",
+        "timezone": "UTC"
+      },
+      "scope": "EXAMPLE TEMPLATE ONLY. Replace dates and values with the platform-reported window. Display API lifetime counters are not views earned during this date window.",
+      "provenance": {
+        "kind": "platform-export",
+        "label": "EXAMPLE TEMPLATE — replace with the source report name"
+      },
+      "metrics": {
+        "views": null,
+        "engagedViews": null,
+        "watchHours": null,
+        "likes": null,
+        "comments": null,
+        "shares": null,
+        "followers": null,
+        "subscribersNet": null
+      },
+      "daily": [],
+      "content": []
+    }
+  ]
+}

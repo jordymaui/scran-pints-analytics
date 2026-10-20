@@ -1,0 +1,151 @@
+# Connecting the source reports
+
+The deployed service refreshes reports on Vercel and stores connections, successful snapshots, history, and run status privately in Supabase. No running laptop or local script is required. The public dashboard reads dated, approved projections of those snapshots. This repository includes read-only YouTube episode/Shorts and basic TikTok collectors; Instagram and deeper TikTok Accounts reporting still require the setup described below. No account connection has been proven with a live response in this build. No platform credentials belong in this repository, a browser bundle, a public JSON file, or a sponsor link.
+
+The owner reports existing YouTube API access and has Viewstats Pro. The inspected main site's Google configuration supports identity sign-in; no YouTube reporting OAuth grant was found there. Reuse an existing Google project if available, then supply or obtain the actual channel authorization. Instagram and TikTok application setup starts from scratch. A signed-in browser or a Pro browser extension is not evidence that a server has API access.
+
+## Connect and refresh online
+
+1. Provision the private tables and functions from `supabase/provision.sql` in the existing Supabase project. Set the server environment in the existing Vercel project, using `.env.example` and the deployment documentation. Keep the Supabase server secret separate from the publishable Auth key.
+2. Configure the team's Google sign-in and exact allowed email addresses. This protects the workspace; it does not itself authorize YouTube analytics.
+3. Configure a Google OAuth web client with the deployed YouTube callback, then authorize the channel from the team's Connections screen. The provider grant is stored privately. Only read-only YouTube scopes are requested.
+4. Create and obtain approval for the required TikTok and Meta applications. Authorization and reporting capabilities differ by product; the availability table below is the authority on what the implemented adapters collect. Creating an application is not the same as receiving reporting access.
+5. Use **Refresh** in Connections after a platform is authorized. The browser sends a same-origin, team-authenticated `POST /api/sync?source=youtube` (or `youtube-shorts`, `instagram`, `tiktok`). It never sends platform tokens. Unconnected or incomplete integrations show a setup status and retain any previous successful report.
+
+Vercel cron calls `GET /api/sync?source=...` with its `Authorization: Bearer CRON_SECRET` header. Generate a long random `CRON_SECRET` and store it only in the production server environment. Each source has its own daily job. The scheduled YouTube window ends three Pacific calendar days before execution to allow processing; Shorts requests the preceding 28 days, while the selected episode workshop refreshes from each video's publication date. Returned coverage, not the requested end date, determines the displayed freshness.
+
+| Source | Implemented refresh | Remaining dependency |
+| --- | --- | --- |
+| YouTube workshop | Current metadata and supported activity, daily, traffic and retention reports for the selected episodes | Approved read-only channel grant; native Studio experiments remain separately dated evidence. |
+| YouTube Shorts | Paginated daily activity split by the API's exact `SHORTS` content type | Same channel grant; individual Short metadata is not yet collected. |
+| TikTok Display | All returned public video counters and current followers; server refresh-token rotation | Approved app/scopes and owner consent. No watch-time, completion or native daily analytics from this product. |
+| TikTok Accounts | Documented setup path for detailed owned-account insights | Separate access application, approved product/scopes, verified account response and adapter implementation. |
+| Instagram Insights | Explicit setup status; no fabricated empty report | Professional account authorization and verified current metric/version compatibility before activating the reporting adapter. |
+
+Every run acquires a private lease; episodes and Shorts share the YouTube lease. A successful validated snapshot replaces the latest version atomically and archives the previous one. Failed collection, expired authorization, unavailable metrics, incomplete pagination, or an older result keeps the previous successful data. Safe run metadata records the outcome without raw provider error bodies or credentials. The cloud runtime rotates TikTok refresh tokens and persists replacements before requesting reports. [TikTok token lifecycle](https://developers.tiktok.com/docs/en/oauth-user-access-token-management).
+
+With Fluid Compute, Vercel Hobby supports a 300-second function duration and daily cron jobs; cron execution may be delayed within its scheduled hour. The service bounds total network work below that limit and uses a lease for duplicate/overlapping execution. Confirm the deployment's plan supports its commercial use and required refresh frequency. A schedule configuration does not prove a deployment or completed live run. [Function duration](https://vercel.com/docs/functions/configuring-functions/duration), [Cron limits](https://vercel.com/docs/cron-jobs/usage-and-pricing), [Cron behavior and security](https://vercel.com/docs/cron-jobs/manage-cron-jobs).
+
+## Optional developer collectors
+
+These commands are for development and one-off validation. Production runs on Vercel and persists to Supabase.
+
+Use Node 22 or later and set secrets only in the deployment's server environment or ignored `.env.local`. Never put token values on the command line.
+
+| Environment variable | Purpose |
+| --- | --- |
+| `YOUTUBE_ACCESS_TOKEN` | A current access token with `yt-analytics.readonly`; useful for a connection check. |
+| `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, `YOUTUBE_REFRESH_TOKEN` | Alternative to the access token: the collector exchanges this existing grant for an access token on the server. |
+| `YOUTUBE_CHANNEL_ID` | Optional channel ID; defaults to the authorized channel (`MINE`). |
+| `YOUTUBE_ACCOUNT_LABEL` | Optional curated public account name. |
+| `TIKTOK_ACCESS_TOKEN` | Current owner-authorized token with approved `user.info.basic`, `user.info.stats`, and `video.list` access. |
+| `TIKTOK_ACCOUNT_LABEL` | Optional curated public account name; defaults to the API's display name. |
+
+```sh
+node --env-file-if-exists=.env.local scripts/sync-social.mjs --source youtube-shorts --start 2026-10-01 --end 2026-10-17
+node --env-file-if-exists=.env.local scripts/sync-social.mjs --source tiktok
+node --env-file-if-exists=.env.local scripts/sync-social.mjs --source all --start 2026-10-01 --end 2026-10-17 --write
+node --test tests/collectors.test.mjs
+```
+
+These commands call only documented read/report endpoints, plus Google's token refresh endpoint where configured. The default collects and validates without changing files. Output contains connection status, windows, available metric names, and row counts; it contains no tokens or raw provider error bodies.
+
+`--write` passes successful sources through the importer and archives their previous public snapshot. Failed, unconfigured, or blocked sources keep their previous data. The command exits nonzero when any requested source did not succeed, including a partial run. An absent Shorts report does not overwrite real prior data with invented zeros.
+
+The Shorts adapter pages through `day,creatorContentType` Analytics rows, locates fields by returned column names, selects only `SHORTS`, and sums additive metrics. It preserves missing dates and annotates requested versus returned coverage. It does not collect individual Short metadata or infer format from duration. TikTok pages through every returned public video, records current followers and lifetime counters, and emits no fabricated daily series or watch time. Its observation date must not be treated as a day of earned views.
+
+Instagram currently returns an explicit blocked setup status and makes no request. Its live metric/version matrix could not be verified during this run, and no authorized professional account is configured. This is an unfinished connector, not a successful empty Instagram report.
+
+The optional `sync-social.mjs` command accepts a current TikTok access token; token renewal is implemented in the cloud service, not this local command.
+
+## What each connection can supply
+
+| Source | Read-only collection route | Important distinction |
+| --- | --- | --- |
+| YouTube videos and Shorts | YouTube Data API for current metadata; Analytics API for period reports; Reporting API for thumbnail reach reports | Separate `VIDEO_ON_DEMAND`, `SHORTS`, and `LIVE_STREAM`. Do not add Shorts to an all-format YouTube total. |
+| Instagram | Instagram Platform Insights for an owned professional account | Account insights and media insights have different metric compatibility, windows, and aggregation. Probe the granted API version rather than asking every media type for every metric. |
+| TikTok, basic coverage | Display API, user-authorized | Public video views, likes, comments, shares, plus account counts. These are current counters, not historical daily analytics. |
+| TikTok, deeper coverage | Approved Organic Accounts API in TikTok API for Business | Separate application/access route. Verify the actual approved account capabilities before promising watch time, completion, reach, or audience reports. |
+| Viewstats Pro | Owner's research workspace and supported exports, if available | Useful for competitor, outlier, title, and thumbnail research. It is not the source of Scran & Pints' private watch-time/retention data or proof of native test results. |
+
+## YouTube: reuse the existing read-only connection
+
+1. Identify the existing Google Cloud project, authorized channel ID, OAuth client configuration, and the service that securely stores its refresh token. Check enabled YouTube Data, Analytics, and Reporting APIs without replacing an existing grant.
+2. Use `https://www.googleapis.com/auth/yt-analytics.readonly` for user-activity reports. Where authenticated Data API metadata is needed, use `https://www.googleapis.com/auth/youtube.readonly`. Monetary scope is optional and unnecessary for the public/sponsor report. Do not request write scopes for this work.
+3. Query the owned channel with `ids=channel==MINE`. Retrieve daily reports grouped by `day,creatorContentType`; use `views`, `engagedViews`, `estimatedMinutesWatched`, `averageViewDuration`, and `averageViewPercentage` in supported report combinations. Separate queries cover engagement/subscribers, traffic sources, demographics, and per-video retention; the API does not allow an arbitrary combination of every dimension and metric. [Channel reports](https://developers.google.com/youtube/analytics/channel_reports), [OAuth authorization](https://developers.google.com/youtube/reporting/guides/authorization).
+4. Fetch current `snippet.title`, `snippet.description`, `snippet.tags`, `snippet.thumbnails`, `contentDetails.duration`, and video statistics through `videos.list`. The Data API exposes current metadata, not a full historical timeline of every title and thumbnail. Record your own approved packaging changes as dated workshop records; do not infer past variants from the current title. [Video resource](https://developers.google.com/youtube/data/reference/rest/v3/videos).
+5. Create Reporting API jobs for `channel_reach_basic_a1` (date, channel, video) and, if needed, `channel_reach_combined_a1` (also traffic/device dimensions). These expose `video_thumbnail_impressions` and `video_thumbnail_impressions_ctr`. Preserve report IDs and revision dates during ingestion. CTR belongs to the whole reported video/cohort, not individual A/B variants. [Reach reports](https://developers.google.com/youtube/reporting/v1/reports/channel_reports#reach-reports).
+
+Analytics reporting typically lags 48–72 hours, and the returned end date can be earlier than requested. Store the actual complete-through date; do not label the last two days as zero. Low-volume dimensions can be suppressed, and channel aggregates can include deleted videos that are absent from video-level reports. Parse returned column headers instead of relying on column order. Refresh or remove stored Data API resource metadata within the documented 30-day requirement. [Analytics data model](https://developers.google.com/youtube/analytics/data_model).
+
+Views need a definition version. Shorts counting changed on 31 March 2025, and the August 2026 documentation aligns public views across all formats to playback beginning. Keep `views` and `engagedViews` separate and annotate comparisons spanning methodology changes. The current API definition of engaged views refers to playback continuing past the first frame or a deliberate click/tap to play. [Revision history](https://developers.google.com/youtube/analytics/revision_history), [Metric definitions](https://developers.google.com/youtube/analytics/metrics).
+
+Native title/thumbnail tests require a separate evidence record. YouTube's help describes tests in Studio, with results based on watch-time share and possible inconclusive outcomes. No native test-results endpoint was found in the documented Data/Analytics interfaces reviewed here, so preserve owner-provided Studio results until a supported export/API is verified. Combined title/thumbnail tests establish evidence for the pairing; whole-video CTR cannot identify which element caused an improvement. Tests are unavailable for Shorts. [YouTube A/B testing](https://support.google.com/youtube/answer/16391400?hl=en).
+
+## Instagram: professional account authorization
+
+Use an owned Business or Creator account. Choose one login route and keep its token type, host, and permission set together:
+
+- Instagram Login: `graph.instagram.com`, with `instagram_business_basic` and `instagram_business_manage_insights`.
+- Facebook Login: `graph.facebook.com`, with `instagram_basic`, `instagram_manage_insights`, and the relevant Page access such as `pages_read_engagement`; verify the professional account's linked Page and any additional requirements for the specific grant.
+
+Configure the redirect URL on the server, authorize the actual Scran & Pints account, and first test identity and one small insights request. Then query `/{instagram-account-id}/insights` and `/{instagram-media-id}/insights`. Standard/advanced access and review requirements depend on whether the app serves its own managed accounts or other users.
+
+The adapter should discover compatible account/media fields for the pinned API version: views, reach, likes, comments, shares, saves, interactions, and available Reel watch-time fields. Keep media product types and organic/paid treatment explicit. Do not silently substitute obsolete `plays`/`impressions` names for `views`. Missing/suppressed metrics remain `null`; do not turn empty responses into zero. Store successful daily results for progression instead of assuming unlimited backfill.
+
+Official references: [Instagram Login](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/), [Insights guide](https://developers.facebook.com/docs/instagram-platform/insights), [Media insights](https://developers.facebook.com/docs/instagram-platform/reference/instagram-media/insights), [User insights](https://developers.facebook.com/docs/instagram-platform/api-reference/instagram-user/insights/). Meta's reference pages rate-limited this documentation review on 20 October 2026; confirm the exact live metric/version matrix and permissions when the account is connected. These are setup requirements, not a claim that this project has an approved Meta application.
+
+## TikTok: select the route with the required coverage
+
+Display API is a workable first connection for public counters. It needs approved Login Kit/Display access, approved scopes, and the account owner's grant. Request `user.info.basic`, `video.list`, and `user.info.stats` for follower/statistical counts; request `user.info.profile` only if profile fields are needed. App approval does not replace the owner's consent. [Getting started](https://developers.tiktok.com/docs/en/display-api-get-started), [Scopes](https://developers.tiktok.com/docs/en/tiktok-api-scopes).
+
+Collect `/v2/user/info/`, paginated `/v2/video/list/`, and `/v2/video/query/` for refreshes. Supported video counters include `view_count`, `like_count`, `comment_count`, and `share_count`; account statistics include `follower_count`. The documented Display video object has no watch-time, retention, completion, or demographics fields. Its cover image URL expires after six hours, so do not use it as a permanent thumbnail asset. [Video object](https://developers.tiktok.com/docs/en/tiktok-api-v2-video-object), [User information](https://developers.tiktok.com/docs/en/tiktok-api-v2-get-user-info), [Video listing](https://developers.tiktok.com/docs/en/tiktok-api-v2-video-list).
+
+Capture counters daily in private storage. A difference between snapshots is a measured counter change, potentially including revisions, deletions, or removals; it is not a native historical report. Do not claim a retrospective 28-day view total from today's lifetime video counters. Use a clearly scoped export until native period reporting is connected.
+
+For the requested deeper reports, pursue the Organic Accounts API rather than treating Display as the finished integration. TikTok's current overview covers owned Business and Personal accounts and permits profile/post insight analysis. Since 20 March 2026, developers must complete its Accounts API access application before submitting a new app or requesting additional TikTok Accounts scopes. Request only the insight capabilities required here; moderation, publishing, and ad authorization are outside this project's collection scope. [Accounts API overview](https://business-api.tiktok.com/portal/docs/accounts-api-overview/v1.3).
+
+TikTok's March 2025 DMA report says approved Accounts API developers can access data free of charge, subject to request limits, and that its Business Analytics metrics became available through the API on 6 January 2025. This establishes the richer product path; it does not grant this project access or establish coverage for a particular approved account. Hosting and any optional third-party tools have their own costs. [TikTok's report, pages 34–35](https://sf16-va.tiktokcdn.com/obj/eden-va2/uhsllrta/DMA/2025%20DMA/Bytedance%20DMA%20Compliance%20Report%20Public%20Overview_2025.pdf#page=35).
+
+The official Business API collection demonstrates video fields including total/average time watched, reach, full-video-watched rate, and audience countries. Before implementing this adapter, verify the approved authentication flow, current endpoint version, pagination, reporting windows, latency, and the units/availability of each requested field using the account's real response. Store its product identifier separately from a Display grant; the token endpoints and scope models must not be interchanged. Keep rate/percentage values separate from additive totals in the model. [TikTok's Business video request](https://www.postman.com/tiktok/tiktok-api-for-business/request/7u65xdl/business-video-list), [Accounts guides](https://business-api.tiktok.com/gateway/docs/index?doc_id=1737565048641538&language=ENGLISH). Marketing/Ads reports are separate from organic content reporting.
+
+## Viewstats Pro in the workshop
+
+Use the existing subscription for outlier discovery, competitor examples, and packaging collections. Save a public video URL, capture date, observed title/thumbnail, and the research hypothesis in the workshop. Keep that evidence distinct from owned-channel API measurements and native Studio test results. The official materials reviewed describe research and ideation tools; they do not establish API access for this account or permission to reuse an extension's private endpoints. [Viewstats Pro](https://www.viewstats.com/pro-upgrade), [Collections and ideation](https://viewstats.zendesk.com/hc/en-us/articles/22967147770651-Collections-Ideation-Tool).
+
+## Import an owner-reviewed snapshot now
+
+Prepare a curated JSON file using `examples/social-import.example.json`. The example is an empty template, not channel performance, and is not loaded by the dashboard.
+
+```sh
+node scripts/import-social.mjs path/to/curated-report.json
+node scripts/import-social.mjs path/to/curated-report.json --write
+node --test tests/import-social.test.mjs
+```
+
+The first command validates without changing files. `--write` merges only the included platforms into `integrations/social.json`, retains other platforms, and archives the exact previous snapshot in ignored `.private/social-imports/` before replacement. Use the project's allowlisted local server/public build: never expose the repository root as a public file server.
+
+Every source requires:
+
+- `id`: `youtube-shorts`, `instagram`, or `tiktok`; `status` must be `snapshot`.
+- Human-readable `label`, `accountLabel`, `scope`, and `provenance.label`, plus `provenance.kind` of `platform-export` or `official-api`. Labels are public descriptions, not raw export paths.
+- `capturedAt` as an ISO timestamp and `dateRange` with inclusive `start`, `end`, and a real reporting timezone. Use the source report's timezone.
+- The eight `metrics` keys in the example. Unknowns are `null`; an observed zero is `0`. Counts are safe integers; `watchHours` can be fractional and `subscribersNet` can be negative.
+- `daily` entries with unique `day` and nullable `views`, within the source's window. Omitted dates remain missing; the importer does not invent points.
+- `content` entries with unique `id`, public `title`, canonical HTTPS platform `url`, ISO `publishedAt`, `thumbnail: null`, and nullable `views`, `likes`, `comments`, `shares`.
+
+Counts and daily/content data must describe the same declared reporting window. `followers` is the account count as of capture, not a period gain. Explain coverage in `scope`; do not manufacture totals from an incomplete content sample. No cross-platform total represents unique people. Never combine different reporting windows or an all-format YouTube total with its Shorts subset. The importer validates structure, URLs, dates, duplication, numeric values, and public-field boundaries; an owner still verifies the source figures and their meaning.
+
+Do not pass a raw platform export directly to the importer. Unknown fields, credential-shaped values, local paths, remote thumbnails, and tracking URLs are rejected. Structural validation cannot recognize every possible secret in otherwise ordinary text, so all descriptive fields must be curated for publication.
+
+## Data and provenance requirements
+
+Keep the public model separate from a private collection service:
+
+1. Private configuration stores platform, account/channel ID, provider app ID, enabled report capabilities, granted scopes, reporting timezone, and secret-store entries. Store no token in a public config. Reuse an existing YouTube project when available, but obtain a reporting grant separately from team identity sign-in.
+2. Each adapter obtains a server-side access token, paginates supported read-only reports, respects rate limits, and records success/failure without logging token-bearing URLs or headers.
+3. Private provenance records include provider/API version, endpoint/report type, query window, dimensions, original metric names/units, retrieval time, actual complete-through date, availability reason, native-versus-derived status, and metric-definition version. Keep raw responses and historical snapshots outside published assets.
+4. The scheduled Vercel job refreshes each source, re-fetches recent delayed days, and publishes a validated allowlisted snapshot. Schedule frequency must reflect provider latency and quotas. A failed refresh keeps the last successful data and displays its age; it must not substitute demo values.
+5. The public/YEET view reads approved aggregate metrics and content only. Internal workshop notes, credentials, private financial records, and unpublished packaging stay behind server-enforced access. Hiding a tab or using an obscure link is not access control.
+
+Connection acceptance requires one real identity response, one real dated report per platform, a refresh-token round trip, a missing-permission failure, a stale-data case, and reconciliation with the native platform for the same window/timezone/metric definition. Only then describe that platform as connected; still label its data freshness precisely.
