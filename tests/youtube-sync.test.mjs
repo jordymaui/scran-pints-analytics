@@ -7,7 +7,8 @@ import { collectYouTubeEpisodes, commitYouTubeRefresh, decodeReport, REPORTS, AC
 import { metadataAudit, windowMetrics } from '../lib/workshop-model.mjs';
 import { normalizeYouTubeContentType } from '../lib/youtube-content-type.mjs';
 import { publicYouTubeFixture } from './fixtures/public-youtube.mjs';
-import { CHANNEL_BREAKDOWN_REPORTS, UPLOAD_REPORTS, UPLOAD_ACTIVITY_METRICS } from '../lib/youtube-breakdowns.mjs';
+import { CHANNEL_BREAKDOWN_REPORTS, UPLOAD_REPORTS, UPLOAD_ACTIVITY_METRICS,
+  UPLOAD_RETENTION_SEGMENTS_REPORT } from '../lib/youtube-breakdowns.mjs';
 
 const ids = ['abcdefghijk', 'lmnopqrstuv'];
 const capturedAt = '2026-09-08T12:00:00Z';
@@ -105,6 +106,14 @@ function mockYouTube({
     const requestedIds = url.searchParams.get('filters').replace('video==', '').split(',');
     const requested = requestedIds.map(id => byId.get(id));
     const dimension = url.searchParams.get('dimensions') || '';
+    if (dimension === 'elapsedVideoTimeRatio') {
+      if (failReport === 'retention') return { ok: false, status: 403, json: async () => ({ error: 'private provider message' }) };
+      if (url.searchParams.get('metrics') === UPLOAD_RETENTION_SEGMENTS_REPORT.metrics) {
+        return response(report(UPLOAD_RETENTION_SEGMENTS_REPORT, emptyRetention ? [] : [[.05, 1, 2, 3], [.5, 1, 2, 3]]));
+      }
+      assert.equal(url.searchParams.get('metrics'), REPORTS.retention.metrics);
+      return response(report(REPORTS.retention, emptyRetention ? undefined : [[.05, .75, .45], [.5, .4, .3]]));
+    }
     const uploadType = Object.keys(UPLOAD_REPORTS).find(type =>
       UPLOAD_REPORTS[type].metrics === url.searchParams.get('metrics') &&
       [UPLOAD_REPORTS[type].dimensions || '', ['video', UPLOAD_REPORTS[type].dimensions].filter(Boolean).join(',')].includes(dimension) &&
