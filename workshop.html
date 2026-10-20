@@ -4,33 +4,35 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <meta name="theme-color" content="#db0b19">
-  <title>YouTube Workshop · Scran &amp; Pints</title>
+  <meta name="theme-color" content="#f5f3ed">
+  <title>Studio · Scran &amp; Pints</title>
   <link rel="icon" href="/favicon.png">
   <link rel="stylesheet" href="/workshop.css">
   <script type="module" src="/workshop.js"></script>
 </head>
-<body>
-  <a class="skip-link" href="#main">Skip to workshop</a>
-  <div class="edition"><span>SCRAN &amp; PINTS / THE WORKSHOP</span><span>TEAM ACCESS · SAVED EVIDENCE</span></div>
-  <header class="site-header">
-    <a href="/" aria-label="Scran and Pints home"><img src="/assets/optimized/3f526c1560f0-480.webp" width="166" height="76" alt="Scran &amp; Pints"></a>
-    <nav aria-label="Main navigation"><a href="/">Public dashboard</a><a href="/sponsor.html">YEET partner view</a><a href="/workshop.html" aria-current="page">Workshop</a><a href="/connections.html">Connections</a><a href="/review-room.html">Review Room ↗</a></nav>
-  </header>
-  <main id="main">
-    <section class="hero">
-      <div><p class="eyebrow">THE NEXT VIDEO STARTS HERE</p><h1>Small details.<br><em>Better videos.</em></h1><p class="hero-copy">Put the episodes side by side. Find the questions worth testing. Build a better title, thumbnail and first thirty seconds.</p><p class="source-stamp" id="source-stamp">Opening the saved YouTube evidence…</p></div>
-      <aside class="workshop-ticket" aria-label="Workshop purpose"><span>THE TEAM PLAYBOOK</span><strong>Watch.<br>Learn.<br>Go again.</strong><div><b>01</b> Compare the same stage<br><b>02</b> Keep the pairs together<br><b>03</b> Write the next experiment</div></aside>
-    </section>
-    <div id="load-state" class="notice" role="status">Loading the workshop…</div>
+<body class="studio">
+  <a class="skip-link" href="#main">Skip to Studio</a>
+  <aside class="studio-sidebar">
+    <a class="studio-brand" href="/" aria-label="Scran and Pints overview"><img src="/assets/optimized/3f526c1560f0-480.webp" width="146" height="66" alt="Scran &amp; Pints"></a>
+    <nav aria-label="Main navigation">
+      <a href="/"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="5" height="5"/><rect x="12" y="3" width="5" height="5"/><rect x="3" y="12" width="5" height="5"/><rect x="12" y="12" width="5" height="5"/></svg>Overview</a>
+      <a href="/?page=videos"><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="4" width="16" height="12" rx="2"/><path d="m8 7 5 3-5 3Z"/></svg>Videos</a>
+      <a href="/workshop.html" aria-current="page"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 16h14M5 13V8m5 5V4m5 9v-3"/></svg>Studio</a>
+      <a href="/sponsor.html"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 17V3h12l-3 4 3 4H4"/></svg>YEET</a>
+    </nav>
+    <div class="studio-sidebar-bottom"><a href="/connections.html"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 13 6-6M7 6l2-2a4 4 0 0 1 6 6l-1 1M6 9l-1 1a4 4 0 0 0 6 6l2-2"/></svg>Connections</a><a class="studio-site-link" href="https://scranpints.com" target="_blank" rel="noreferrer">scranpints.com ↗</a></div>
+  </aside>
+  <div class="studio-app">
+  <header class="studio-header"><div><h1>Studio</h1><span>Private team analytics</span></div><form id="team-sign-out" action="/api/auth/logout" method="post" hidden><button class="text-button" type="submit">Sign out</button></form></header>
+  <main id="main" class="studio-main">
+    <div id="load-state" class="notice" role="status">Loading Studio…</div>
     <div id="workshop-content" hidden>
-      <nav class="section-nav" aria-label="Workshop sections"><a href="#analytics">Analytics</a><a href="#compare">Compare</a><a href="#packaging">Packaging</a><a href="#metadata">Metadata</a><a href="#notebook">Notebook</a></nav>
-      <section id="analytics" class="work-section analytics-section">
-        <div class="section-heading"><div><span class="eyebrow">PRIVATE YOUTUBE ANALYTICS</span><h2>The channel. The Shorts. The episodes.</h2></div><a class="button secondary" href="/connections.html">Refresh reporting ↗</a></div>
-        <p class="section-intro">Channel totals come from YouTube's channel report. Each collection below keeps its own date range; episode and Shorts figures are not added to the channel total.</p>
+      <nav class="section-nav" aria-label="Studio sections"><a href="#analytics" data-studio-tab="analytics" aria-current="location">Analytics</a><a href="#compare" data-studio-tab="compare">Compare</a><a href="#packaging" data-studio-tab="packaging">Packaging</a><a href="#metadata" data-studio-tab="metadata">Metadata</a><a href="#notebook" data-studio-tab="notebook">Notebook</a></nav>
+      <section id="analytics" data-studio-panel class="work-section analytics-section">
+        <div class="section-heading studio-toolbar"><div><h2>YouTube analytics</h2><p class="source-stamp" id="source-stamp">Opening the saved report…</p></div><a class="button secondary" href="/connections.html">Refresh data ↗</a></div>
         <div id="channel-analytics"></div>
         <div id="shorts-analytics"></div>
-        <div class="section-heading analytics-heading"><div><span class="eyebrow">FULL EPISODE LEDGER</span><h3>Every included episode, every collected metric.</h3></div><button id="export-episode-analytics" class="button secondary" type="button">Export episode metrics ↓</button></div>
+        <div class="section-heading analytics-heading"><h3>Episode performance</h3><button id="export-episode-analytics" class="button secondary" type="button">Export metrics ↓</button></div>
         <p id="episode-analytics-note" class="note"></p>
         <div class="controls analytics-controls"><label class="search-label">Find an episode<input id="analytics-search" type="search" placeholder="Search titles…"></label><label class="inline-label">Sort by<select id="analytics-sort"><option value="views">Views</option><option value="watchHours">Watch hours</option><option value="publishedAt">Newest published</option><option value="subscribersNet">Net subscribers</option></select></label></div>
         <div class="table-scroll analytics-table" tabindex="0" role="region" aria-label="All episode Analytics metrics"><table><caption class="sr-only">Native per-video aggregate reports, each since publication</caption><thead><tr><th scope="col">Episode / source dates</th><th scope="col">Views</th><th scope="col">Watch hours</th><th scope="col">Avg. seconds</th><th scope="col">Avg. % watched</th><th scope="col">Likes</th><th scope="col">Comments</th><th scope="col">Shares</th><th scope="col">Subs gained</th><th scope="col">Subs lost</th><th scope="col">Net subs</th></tr></thead><tbody id="episode-analytics-body"></tbody></table></div>
@@ -38,10 +40,9 @@
         <div id="episode-analytics-detail"></div>
         <p class="notice quiet">Impressions and CTR remain in the dated Studio evidence below. Channel breakdowns above show only saved native reports. Revenue and individual-Short reports have not been collected here. Missing data stays unavailable.</p>
       </section>
-      <section class="summary-strip" id="summary-strip" aria-label="Evidence coverage"></section>
-      <div id="discovery-note" class="notice quiet" aria-label="Upload discovery coverage"></div>
-      <section id="compare" class="work-section">
-        <div class="section-heading"><div><span class="eyebrow">01 / THE SAME STARTING LINE</span><h2>Compare the episodes.</h2></div><button id="export-comparison" class="button secondary" type="button">Export comparison ↓</button></div>
+      <section id="compare" data-studio-panel class="work-section">
+        <div class="section-heading"><h2>Compare episodes</h2><button id="export-comparison" class="button secondary" type="button">Export comparison ↓</button></div>
+        <details class="studio-coverage"><summary>Comparison coverage</summary><div class="summary-strip" id="summary-strip" aria-label="Evidence coverage"></div><div id="discovery-note" class="notice quiet" aria-label="Upload discovery coverage"></div></details>
         <div class="controls">
           <fieldset class="segmented"><legend class="sr-only">Comparison window</legend><label><input name="window" type="radio" value="3" checked><span>First 3 dates</span></label><label><input name="window" type="radio" value="7"><span>First 7 dates</span></label></fieldset>
           <label class="inline-label">Sort by<select id="comparison-sort"><option value="views">Views</option><option value="watchHours">Watch hours</option><option value="subscribersNet">Net subscribers</option><option value="episode">Episode order</option></select></label>
@@ -49,28 +50,28 @@
         <p class="note" id="window-note"></p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="Episode comparison table"><table><caption class="sr-only">Same-age episode performance from the saved API export</caption><thead><tr><th scope="col">Video / title capture</th><th scope="col">Views</th><th scope="col">Watch hours</th><th scope="col">Net subscribers</th><th scope="col">Source dates</th></tr></thead><tbody id="comparison-body"></tbody></table></div>
         <div class="head-to-head">
-          <div class="section-heading compact"><div><span class="eyebrow">LOOK UNDER THE NUMBERS</span><h3>Two episodes. One closer look.</h3></div><div class="pair-selects"><label>Episode A<select id="video-a"></select></label><label>Episode B<select id="video-b"></select></label></div></div>
+          <div class="section-heading compact"><h3>Episode comparison</h3><div class="pair-selects"><label>Episode A<select id="video-a"></select></label><label>Episode B<select id="video-b"></select></label></div></div>
           <div id="video-cards" class="video-cards"></div>
-          <div class="chart-panel"><div class="section-heading compact"><h3>Where people kept watching</h3><span class="pill">API retention · saved snapshot</span></div><p class="note">The horizontal axis is percentage through each video, so different lengths line up. This curve has its own API source window and does not change with the 3/7-date selector.</p><div id="retention-chart"></div></div>
+          <div class="chart-panel"><div class="section-heading compact"><h3>Audience retention</h3><span class="pill">Saved API report</span></div><p class="note">Percentage through each video. Retention uses its own source window and does not change with the 3/7-date selector.</p><div id="retention-chart"></div></div>
           <div id="comparison-prompt" class="comparison-prompt"></div>
         </div>
       </section>
-      <section id="packaging" class="work-section">
-        <div class="section-heading"><div><span class="eyebrow">02 / THE CLICK &amp; THE PROMISE</span><h2>Keep the pair together.</h2></div><div class="text-links"><a href="/title-table.html">Title Table ↗</a><a href="/thumbnail-lab.html">Thumbnail Lab ↗</a></div></div>
-        <p class="section-intro">See the title and image exactly as they were recovered. Native test watch-time share belongs to the whole pairing. It cannot tell us which title or image caused the difference.</p>
+      <section id="packaging" data-studio-panel class="work-section">
+        <div class="section-heading"><h2>Titles &amp; thumbnails</h2><div class="text-links"><a href="/title-table.html">Title Table ↗</a><a href="/thumbnail-lab.html">Thumbnail Lab ↗</a><a href="/review-room.html">Review Room ↗</a></div></div>
+        <p class="section-intro">Saved title/thumbnail pairs and native tests. Watch-time share describes the pair, not either element in isolation.</p>
         <div class="controls packaging-controls"><label>Episode<select id="packaging-video"><option value="all">All episodes</option></select></label><label>Evidence<select id="packaging-scope"><option value="latest">Latest recovered test per episode</option><option value="all">Every saved test round</option><option value="history">Title &amp; thumbnail capture history</option></select></label><label class="search-label">Find a title<input id="packaging-search" type="search" placeholder="Price, club, BEST, WORST…"></label></div>
         <p id="packaging-count" class="note" aria-live="polite"></p>
         <div id="packaging-results"></div>
         <div class="notice quiet">Highest share means the largest number within that test. It does not establish a winner. Old rounds, unfinished tests and later captures stay separate; missing variant CTR, impressions and watch hours remain unavailable.</div>
       </section>
-      <section id="metadata" class="work-section">
-        <div class="section-heading"><div><span class="eyebrow">03 / CHECK THE FOUNDATIONS</span><h2>What we can actually audit.</h2></div><span class="pill">COLLECTION GAPS VISIBLE</span></div>
+      <section id="metadata" data-studio-panel class="work-section">
+        <div class="section-heading"><h2>Video metadata</h2></div>
         <p class="section-intro" id="metadata-intro">Title length and recovered packaging are available now. Descriptions and tags have not been collected. Collection dates will appear when a verified YouTube refresh supplies them.</p>
         <div class="table-scroll" tabindex="0" role="region" aria-label="Metadata coverage table"><table><thead><tr><th scope="col">Episode</th><th scope="col">Title length</th><th scope="col">Recovered titles</th><th scope="col">Image captures</th><th scope="col">Description</th><th scope="col">Tags</th></tr></thead><tbody id="metadata-body"></tbody></table></div>
         <p class="note">Title counts exclude drafts; repeated captures are retained for provenance. Character count is descriptive, not a quality score. Use Connections to collect current metadata, and retain its source date when comparing changes.</p>
       </section>
-      <section id="notebook" class="work-section">
-        <div class="section-heading"><div><span class="eyebrow">04 / TURN A QUESTION INTO A TEST</span><h2>The experiment notebook.</h2></div><div class="text-links"><button id="reload-notebook" class="button secondary" type="button">Reload team notes ↻</button><button id="export-notebook" class="button secondary" type="button">Export JSON ↓</button><label class="button secondary import-label">Import JSON<input id="import-notebook" type="file" accept=".json,application/json"></label></div></div>
+      <section id="notebook" data-studio-panel class="work-section">
+        <div class="section-heading"><h2>Experiment notebook</h2><div class="text-links"><button id="reload-notebook" class="button secondary" type="button">Reload notes ↻</button><button id="export-notebook" class="button secondary" type="button">Export JSON ↓</button><label class="button secondary import-label">Import JSON<input id="import-notebook" type="file" accept=".json,application/json"></label></div></div>
         <div class="notice notebook-note"><strong>Shared with the signed-in team.</strong> Save drafts to the cloud notebook. Changes are version checked before saving; conflicting edits are preserved for review. These notes do not change anything on YouTube. <span id="notebook-connection">Opening shared notes…</span><button id="save-notebook" class="text-button" type="button" disabled>Save pending notebook changes</button><button id="import-browser-notebook" class="text-button" type="button" hidden>Import older browser drafts</button></div>
         <div class="notebook-layout">
           <form id="experiment-form" class="experiment-form">
@@ -87,13 +88,14 @@
             <label>Observed result &amp; evidence<textarea id="experiment-result" name="result" maxlength="4000" rows="3" placeholder="Leave blank until measured. Include dates, source and limitations."></textarea></label>
             <button class="button" type="submit">Save team draft</button><p class="note" id="notebook-status" role="status"></p>
           </form>
-          <aside><div class="notebook-guide"><span class="eyebrow">MAKE THE LESSON REUSABLE</span><h3>A hypothesis is a starting point.</h3><ol><li>Record the exact pairing and source dates.</li><li>Choose the outcome before looking at results.</li><li>Keep a comparable baseline; note audience and timing differences.</li><li>Keep “inconclusive” as a valid result.</li></ol></div><div class="saved-heading"><h3>Saved experiments</h3><span id="draft-count" class="pill">0</span></div><div id="saved-experiments"></div></aside>
+          <aside><div class="notebook-guide"><h3>Experiment checklist</h3><ol><li>Record the exact pairing and source dates.</li><li>Choose the outcome before looking at results.</li><li>Keep a comparable baseline; note audience and timing differences.</li><li>Keep “inconclusive” as a valid result.</li></ol></div><div class="saved-heading"><h3>Saved experiments</h3><span id="draft-count" class="pill">0</span></div><div id="saved-experiments"></div></aside>
         </div>
       </section>
       <details class="method"><summary>Sources, definitions &amp; comparison limits</summary><p id="method-dates"></p><p>First 3/7 dates means the publication calendar date plus the following 2/6 dates in the saved API export. The first date can be partial; this is not an exact 72/168-hour comparison. Every date must be present exactly once. Missing windows are excluded, never treated as zero.</p><p>Watch hours sum estimated minutes watched divided by 60. Net subscribers sum gains minus losses. Studio cards are rounded since-published observations at different video ages. They stay separate from equal-age comparisons and native test watch-time shares.</p><p>Saved history is recovered evidence, not a complete switch log. Combined title and thumbnail tests support conclusions about that pairing only. Uncontrolled comparisons between videos suggest questions; they do not establish causality.</p></details>
     </div>
-    <footer><img src="/assets/optimized/3f526c1560f0-480.webp" width="140" height="64" alt="Scran &amp; Pints"><p>Every number has a source.<br>Every new idea starts as a question.</p><nav aria-label="Information"><a href="/privacy.html">Privacy</a> · <a href="/terms.html">Usage notice</a> · <a href="#main">Back to top ↑</a></nav></footer>
+    <footer><span>Scran &amp; Pints · Studio</span><nav aria-label="Information"><a href="/privacy.html">Privacy</a> · <a href="/terms.html">Usage notice</a> · <a href="#main">Back to top ↑</a></nav></footer>
   </main>
+  </div>
   <dialog id="image-dialog"><button id="close-image" class="button" type="button">Close ×</button><img id="preview-image" alt=""><p id="preview-caption"></p></dialog>
 </body>
 </html>

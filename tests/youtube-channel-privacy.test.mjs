@@ -4,6 +4,7 @@ import { readBundledInputs, loadPublicReport } from '../lib/cloud-report.mjs';
 import { createWorkshopDataHandler } from '../api/workshop-data.mjs';
 import { validateChannelBreakdowns } from '../lib/youtube-breakdowns.mjs';
 import { publicYouTubeFixture } from './fixtures/public-youtube.mjs';
+import { YOUTUBE_ANALYTICS_PROVENANCE } from '../lib/social-schema.mjs';
 
 const PRIVATE_CAPTURE = '2026-10-21T12:00:00.000Z';
 const SHORTS_CAPTURE = '2026-10-19T12:00:00.000Z';
@@ -34,22 +35,22 @@ function shortsAnalytics() {
     id: 'youtube-shorts', label: 'YouTube Shorts', accountLabel: 'Scran & Pints',
     status: 'snapshot', capturedAt: SHORTS_CAPTURE,
     dateRange: { start: '2026-09-19', end: '2026-10-16', timezone: 'America/Los_Angeles' },
-    scope: 'Private Shorts daily source.', provenance: { kind: 'official-api', label: 'YouTube Analytics API' },
+    scope: 'Shorts daily source.', provenance: { kind: 'official-api', label: YOUTUBE_ANALYTICS_PROVENANCE },
     metrics: { views: 730000111, engagedViews: 730000112, watchHours: 730000113,
       likes: 7, comments: 8, shares: 9, followers: null, subscribersNet: 10 },
     daily: [{ day: '2026-10-16', views: 730000111 }], content: [],
   };
 }
-const privatePattern = /channelAnalytics|shortsAnalytics|channelBreakdowns|viewerPercentage|73000000[1-6]|73000011[1-3]|73000022[12]|37\.123456/;
+const privatePattern = /channelAnalytics|shortsAnalytics|channelBreakdowns|viewerPercentage|730000112|73000022[12]|37\.123456|PRIVATE_EVIDENCE/;
 
-test('channel, Shorts and audience breakdowns never enter public output with current counters or historical fallback', async () => {
+test('only selected channel and Shorts performance enters public output; raw reports and audiences stay excluded', async () => {
   for (const mode of ['current', 'missing-public', 'invalid-public']) {
     const bundled = await readBundledInputs();
     const snapshot = structuredClone(bundled.snapshot);
     snapshot.channelAnalytics = channelAnalytics();
     snapshot.channelBreakdowns = channelBreakdowns();
     snapshot.capturedAt = PRIVATE_CAPTURE;
-    snapshot.privateEvidence = '730000001';
+    snapshot.privateEvidence = 'PRIVATE_EVIDENCE';
     if (mode !== 'missing-public') snapshot.publicReport = publicYouTubeFixture();
     if (mode === 'invalid-public') snapshot.publicReport.channel.views = -1;
     const options = { bundled, storeFactory: () => ({
@@ -62,11 +63,15 @@ test('channel, Shorts and audience breakdowns never enter public output with cur
     }) };
     const report = await loadPublicReport(options);
     assert.doesNotMatch(JSON.stringify(report), privatePattern, mode);
-    assert.equal(report.sources[1].metrics, null);
-    assert.deepEqual(report.sources[1].daily, []);
-    assert.equal(report.sources[0].capturedAt, mode === 'current' ? publicYouTubeFixture().capturedAt : bundled.snapshot.capturedAt);
-    assert.equal(report.sources[0].snapshotOrigin, mode === 'current' ? 'cloud' : 'bundled');
-    assert.equal(report.sources[0].metrics.views, mode === 'current' ? 987654 : bundled.snapshot.videos.reduce((sum, video) => sum + video.apiAggregate.views, 0));
+    assert.equal(report.sources[0].performance.totals.views, 730000001);
+    assert.equal(report.sources[0].performance.capturedAt, PRIVATE_CAPTURE);
+    assert.equal(report.sources[1].performance.totals.views, 730000111);
+    assert.equal(report.sources[1].performance.capturedAt, SHORTS_CAPTURE);
+    assert.equal(report.sources[1].performance.daily[0].watchHours, null);
+    assert.equal(report.sources[1].metrics.engagedViews, null);
+    assert.equal(report.sources[0].capturedAt, mode === 'current' ? publicYouTubeFixture().capturedAt : PRIVATE_CAPTURE);
+    assert.equal(report.sources[0].snapshotOrigin, 'cloud');
+    assert.equal(report.sources[0].metrics.views, mode === 'current' ? 987654 : 730000001);
   }
 });
 

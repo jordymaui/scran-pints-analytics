@@ -14,7 +14,7 @@ export const PUBLIC_FILES = Object.freeze([
   'login.html', 'login.js', 'login.css', 'favicon.png',
   'connections.html', 'connections.js', 'connections.css',
   'privacy.html', 'terms.html', 'notice.css',
-  'lib/report-model.mjs', 'lib/workshop-model.mjs',
+  'lib/report-model.mjs', 'lib/workshop-model.mjs', 'lib/dashboard-metrics.mjs',
   'assets/scran-pints-logo.png', 'assets/optimized/3f526c1560f0-480.webp',
 ]);
 async function safeSource(name) {

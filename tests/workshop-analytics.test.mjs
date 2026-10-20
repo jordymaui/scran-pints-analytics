@@ -158,3 +158,41 @@ test('overview render uses native channel totals, separate Shorts dates, and dat
   assert.match(element('#channel-analytics').innerHTML, /has not been collected yet/);
   assert.match(element('#shorts-analytics').innerHTML, /No saved private Shorts report/);
 });
+
+test('Studio tabs open deep links and notebook navigation without discarding panel state', async () => {
+  const ids = ['analytics', 'compare', 'packaging', 'metadata', 'notebook'];
+  const panels = ids.map(id => ({ id, hidden: false, draftValue: id === 'notebook' ? 'unsaved hypothesis' : '' }));
+  const links = ids.map(id => ({
+    dataset: { studioTab: id }, attributes: {}, events: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+    removeAttribute(name) { delete this.attributes[name]; },
+    addEventListener(name, callback) { this.events[name] = callback; },
+  }));
+  const events = {};
+  const location = { hash: '#packaging' };
+  const context = vm.createContext({
+    document: { querySelectorAll: selector => selector === '[data-studio-panel]' ? panels : links },
+    window: { addEventListener: (name, callback) => { events[name] = callback; } },
+    location, history: { replaceState: (_state, _title, hash) => { location.hash = hash; } },
+    Intl, Date, Number, String, Map, Set,
+  });
+  const source = (await readFile(new URL('../workshop.js', import.meta.url), 'utf8'))
+    .replace(/^import .*;\r?\n/gm, '').replace(/\r?\nload\(\);\s*$/, '');
+  vm.runInContext(source, context);
+  vm.runInContext('initializeStudioNavigation();', context);
+  assert.deepEqual(panels.filter(panel => !panel.hidden).map(panel => panel.id), ['packaging']);
+  assert.equal(links[2].attributes['aria-current'], 'location');
+  let prevented = false;
+  links[4].events.click({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(location.hash, '#notebook');
+  assert.deepEqual(panels.filter(panel => !panel.hidden).map(panel => panel.id), ['notebook']);
+  assert.equal(panels[4].draftValue, 'unsaved hypothesis');
+  assert.equal(links[2].attributes['aria-current'], undefined);
+  location.hash = '#unknown';
+  events.hashchange();
+  assert.deepEqual(panels.filter(panel => !panel.hidden).map(panel => panel.id), ['analytics']);
+  vm.runInContext("selectStudioSection('notebook');", context);
+  assert.equal(panels[4].hidden, false);
+  assert.equal(panels[4].draftValue, 'unsaved hypothesis');
+});
