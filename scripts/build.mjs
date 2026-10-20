@@ -14,6 +14,7 @@ export const PUBLIC_FILES = Object.freeze([
   'controls.js', 'controls.css', 'date-picker.js', 'date-picker.css',
   'refresh.js', 'refresh.css',
   'thumbnail-preview.js',
+  'sponsor.js', 'sponsor.css', 'assets/yeet-logo.svg',
   'upload-analytics.js', 'upload-analytics.css',
   'workshop.html', 'workshop.js', 'workshop.css',
   'login.html', 'login.js', 'login.css', 'favicon.png',

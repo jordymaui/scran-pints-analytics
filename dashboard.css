@@ -16,3 +16,7 @@
 @media(max-width:540px){#export-report{font-size:0;gap:0;min-width:38px;justify-content:center}#export-report svg{width:16px;height:16px}.toolbar-group:last-child{flex-wrap:nowrap}}
 @media(max-width:380px){.sidebar .nav-item svg{display:none}.sidebar .nav-item{font-size:14px;padding:10px 8px}.sidebar nav{gap:2px}.engagement-chart{gap:20px;padding:16px}.legend-list{min-width:85px}}
 @media(max-width:540px){.top-actions .studio-shortcut{display:none}.top-actions{gap:8px}}
+
+/* Official white YEET mark, displayed on its approved dark background. */
+.yeet-nav-mark{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;padding:7px 10px;border-radius:5px;background:#16171d;line-height:1}
+.yeet-nav-mark img{display:block;width:72px;height:auto;max-width:100%;object-fit:contain}
