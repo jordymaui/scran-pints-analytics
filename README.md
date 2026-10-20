@@ -23,7 +23,7 @@ The public API projects approved fields from saved cloud reports. If storage is 
 
 ## Deploy to the existing project
 
-1. Apply the reviewed [Supabase provisioning SQL](supabase/provision.sql), then run [verification queries](supabase/verify.sql). Tables have RLS enabled and access is restricted to the server role.
+1. Apply the reviewed [Supabase provisioning SQL](supabase/provision.sql), then run [verification queries](supabase/verify.sql). Tables have RLS enabled and access is restricted to the server role. The existing project's [provisioning and verification record](supabase/README.md) documents the initial application.
 2. Set the following **server environment variables** in the existing Vercel project using [`.env.example`](.env.example):
 
    | Variables | Purpose |
