@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f4f0e6"><meta name="description" content="How Scran & Pints Analytics uses account information, reporting data and workshop notes."><title>Privacy & Data Use · Scran & Pints Analytics</title><link rel="icon" href="/favicon.png"><link rel="stylesheet" href="/notice.css"></head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header><a href="/" aria-label="Scran and Pints Analytics home"><img src="/assets/optimized/3f526c1560f0-480.webp" width="158" height="72" alt="Scran &amp; Pints"></a><nav aria-label="Main navigation"><a href="/">The scoreboard</a><a href="/terms.html">Usage notice</a><a href="/workshop.html">Team workshop</a></nav></header>
+<main id="main">
+  <p class="eyebrow">Scran &amp; Pints Analytics</p>
+  <h1>Privacy &amp; data use.</h1>
+  <p class="intro">This dashboard brings together public social reporting, a YEET partnership view, and private research tools for the Scran &amp; Pints team.</p>
+  <p class="updated">Updated 20 October 2026</p>
+  <div class="notice-body">
+    <section>
+      <h2>Who runs this dashboard</h2>
+      <p>Scran &amp; Pints operates this analytics workspace. For questions about its data use, access or deletion, contact <a href="mailto:team@scranpints.com">team@scranpints.com</a>. This notice describes this analytics application; other Scran &amp; Pints websites may have their own notices.</p>
+    </section>
+    <section>
+      <h2>Information used by the workspace</h2>
+      <ul>
+        <li><strong>Team sign-in.</strong> Google sign-in through Supabase supplies account identity information, including the account identifier, email address and profile information returned by Google. The application checks the verified Google identity against its list of approved team email addresses.</li>
+        <li><strong>Reporting connections.</strong> An approved team member can separately authorize read-only YouTube reporting. The server stores the reporting grant, channel identifier, granted permissions and connection dates so it can refresh reports. Google account passwords are entered with Google, not this application.</li>
+        <li><strong>Channel and content reports.</strong> The application uses YouTube API Services to read video metadata and available performance reports, including views, watch time, engagement, subscriber changes, traffic and retention. Each report retains its source and reporting dates. Other social platforms have separate connection requirements and may have no report available.</li>
+        <li><strong>Workshop records.</strong> The private workspace stores team-written hypotheses, proposed packaging, experiment notes and decisions. It also keeps saved reporting snapshots, historical evidence and refresh outcomes for comparison.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>How the information is used and shared</h2>
+      <p>We use these records to review our content, compare results, maintain dated reporting and plan improvements. YouTube reporting access is read-only; the collectors do not publish videos or change titles, descriptions, tags or thumbnails.</p>
+      <p>New public YouTube reports use Data API counters and metadata available for public videos, with their collection dates. Where current public reporting is unavailable, the application can show the separately labelled, previously published historical snapshot. Newly collected private YouTube Analytics details are for the team and expressly approved agents. Access to the private workspace currently requires an approved team email address; a public sponsor link does not grant that access.</p>
+      <p>Public reports and their downloads can be read by anyone, including YEET. Credentials, sign-in details and new workshop notes are excluded from those reports. The repository also contains a separately published historical archive that was intentionally made public; copies already shared outside this application are not controlled by a sign-out or connection change.</p>
+    </section>
+    <section>
+      <h2>Hosting, cookies and connected services</h2>
+      <p>Vercel hosts the site and server functions. Supabase provides team authentication and private database storage. Google processes sign-in and YouTube API requests. These services process information needed to deliver those features.</p>
+      <p>The application uses session and security cookies to maintain team sign-in and complete account connections. Reporting credentials stay on the server. Some public video thumbnails load from YouTube image servers, which receive the browser requests needed to display them. Following an external platform link takes you to that platform's service.</p>
+      <p>Workshop exports and public report downloads save files to the device you choose. The workshop can import earlier browser drafts when a team member chooses that action.</p>
+    </section>
+    <section>
+      <h2>Access, storage and deletion requests</h2>
+      <p>Saved reports and their prior versions support historical comparisons. A failed refresh can leave the previous report in place with its earlier date. This application does not currently provide an automatic deletion schedule or a self-service deletion button.</p>
+      <p>To request deletion of a connection, stored reports or workshop information, email <a href="mailto:team@scranpints.com">team@scranpints.com</a> and identify the account, channel or records concerned. Requests are handled by the team; do not include passwords or access tokens in your message. Deleting records held by this application does not delete videos or account data held by YouTube.</p>
+      <p>You can separately revoke the application's Google access in <a href="https://myaccount.google.com/connections" target="_blank" rel="noreferrer">your Google Account's third-party connections</a>. Revoking access prevents future authorized collection; it does not itself remove stored records from this application. Contact the team to request their deletion.</p>
+    </section>
+    <section>
+      <h2>Google and YouTube information</h2>
+      <p>This application uses YouTube API Services. Read the <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Google Privacy Policy</a>, <a href="https://www.youtube.com/t/terms" target="_blank" rel="noreferrer">YouTube Terms of Service</a> and <a href="https://developers.google.com/youtube/terms/developer-policies" target="_blank" rel="noreferrer">YouTube API Services Developer Policies</a> for those services' terms and data practices.</p>
+    </section>
+  </div>
+  <aside class="contact"><p><strong>A question about your data?</strong> Email <a href="mailto:team@scranpints.com">team@scranpints.com</a>.</p></aside>
+</main>
+<footer><p>Scran &amp; Pints Analytics</p><nav aria-label="Information"><a href="/">Dashboard</a><a href="/privacy.html" aria-current="page">Privacy</a><a href="/terms.html">Usage notice</a></nav></footer>
+</body></html>

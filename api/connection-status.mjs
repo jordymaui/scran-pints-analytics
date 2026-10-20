@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return json(res, 405, { error: 'method_not_allowed' });
   }
   if (!await authorizeRequest(req, res)) return;
-  const setup = { youtubeOAuth: false, tiktokOAuth: false, instagramOAuth: false };
+  const setup = { youtubeOAuth: false, youtubePublic: Boolean(process.env.YOUTUBE_PUBLIC_API_KEY), tiktokOAuth: false, instagramOAuth: false };
   try { youtubeOAuthConfig(); setup.youtubeOAuth = true; } catch { /* Setup remains unavailable. */ }
   try {
     return json(res, 200, { configured: true, setup, platforms: await createCloudStore().getStatuses() });

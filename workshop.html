@@ -26,6 +26,7 @@
     <div id="workshop-content" hidden>
       <nav class="section-nav" aria-label="Workshop sections"><a href="#compare">01 / Compare</a><a href="#packaging">02 / Packaging</a><a href="#metadata">03 / Metadata</a><a href="#notebook">04 / Notebook</a></nav>
       <section class="summary-strip" id="summary-strip" aria-label="Evidence coverage"></section>
+      <div id="discovery-note" class="notice quiet" aria-label="Upload discovery coverage"></div>
       <section id="compare" class="work-section">
         <div class="section-heading"><div><span class="eyebrow">01 / THE SAME STARTING LINE</span><h2>Compare the episodes.</h2></div><button id="export-comparison" class="button secondary" type="button">Export comparison ↓</button></div>
         <div class="controls">
@@ -33,7 +34,7 @@
           <label class="inline-label">Sort by<select id="comparison-sort"><option value="views">Views</option><option value="watchHours">Watch hours</option><option value="subscribersNet">Net subscribers</option><option value="episode">Episode order</option></select></label>
         </div>
         <p class="note" id="window-note"></p>
-        <div class="table-scroll" tabindex="0" role="region" aria-label="Episode comparison table"><table><caption class="sr-only">Same-age episode performance from the saved API export</caption><thead><tr><th scope="col">Episode / saved title</th><th scope="col">Views</th><th scope="col">Watch hours</th><th scope="col">Net subscribers</th><th scope="col">Source dates</th></tr></thead><tbody id="comparison-body"></tbody></table></div>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Episode comparison table"><table><caption class="sr-only">Same-age episode performance from the saved API export</caption><thead><tr><th scope="col">Video / title capture</th><th scope="col">Views</th><th scope="col">Watch hours</th><th scope="col">Net subscribers</th><th scope="col">Source dates</th></tr></thead><tbody id="comparison-body"></tbody></table></div>
         <div class="head-to-head">
           <div class="section-heading compact"><div><span class="eyebrow">LOOK UNDER THE NUMBERS</span><h3>Two episodes. One closer look.</h3></div><div class="pair-selects"><label>Episode A<select id="video-a"></select></label><label>Episode B<select id="video-b"></select></label></div></div>
           <div id="video-cards" class="video-cards"></div>
@@ -78,7 +79,7 @@
       </section>
       <details class="method"><summary>Sources, definitions &amp; comparison limits</summary><p id="method-dates"></p><p>First 3/7 dates means the publication calendar date plus the following 2/6 dates in the saved API export. The first date can be partial; this is not an exact 72/168-hour comparison. Every date must be present exactly once. Missing windows are excluded, never treated as zero.</p><p>Watch hours sum estimated minutes watched divided by 60. Net subscribers sum gains minus losses. Studio cards are rounded since-published observations at different video ages. They stay separate from equal-age comparisons and native test watch-time shares.</p><p>Saved history is recovered evidence, not a complete switch log. Combined title and thumbnail tests support conclusions about that pairing only. Uncontrolled comparisons between videos suggest questions; they do not establish causality.</p></details>
     </div>
-    <footer><img src="/assets/optimized/3f526c1560f0-480.webp" width="140" height="64" alt="Scran &amp; Pints"><p>Every number has a source.<br>Every new idea starts as a question.</p><a href="#main">Back to top ↑</a></footer>
+    <footer><img src="/assets/optimized/3f526c1560f0-480.webp" width="140" height="64" alt="Scran &amp; Pints"><p>Every number has a source.<br>Every new idea starts as a question.</p><nav aria-label="Information"><a href="/privacy.html">Privacy</a> · <a href="/terms.html">Usage notice</a> · <a href="#main">Back to top ↑</a></nav></footer>
   </main>
   <dialog id="image-dialog"><button id="close-image" class="button" type="button">Close ×</button><img id="preview-image" alt=""><p id="preview-caption"></p></dialog>
 </body>
