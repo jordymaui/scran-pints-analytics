@@ -217,3 +217,55 @@ test('basic retention survives empty, failed or differently sampled optional seg
     assert.throws(() => validateUploadAnalytics(invalid), 'only optional segment counts may be null');
   }
 });
+
+function jsonbRoundTrip(value) {
+  if (Array.isArray(value)) return value.map(jsonbRoundTrip);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort()
+    .map(key => [key, jsonbRoundTrip(value[key])]));
+  return value;
+}
+function observation(video, capturedAt) {
+  return { capturedAt, title: video.title, description: video.description,
+    tags: [...video.tags], thumbnail: video.thumbnail };
+}
+
+test('metadata history deduplicates by values across JSONB key order and repeated collections', async () => {
+  const older = catalog.map(video => ({ ...video,
+    metadataHistory: [jsonbRoundTrip(observation(video, '2026-10-18T12:00:00Z'))] }));
+  const previous = jsonbRoundTrip(await collectUploadAnalytics({ ...defaults, catalog: older,
+    capturedAt: '2026-10-19T12:00:00Z', query: queryFixture() }));
+  const latest = catalog.map(video => ({ ...video,
+    metadataHistory: [observation(video, '2026-10-18T12:00:00Z')] }));
+  const result = await collectUploadAnalytics({ ...defaults, catalog: latest, previous, query: queryFixture() });
+  assert.ok(result.videos.every(video => video.metadataHistory.length === 2));
+  assert.deepEqual(validateUploadAnalytics(jsonbRoundTrip(result)), jsonbRoundTrip(result));
+  assert.equal(previous.videos[0].metadataHistory.length, 1, 'previous data is not mutated');
+});
+
+test('saved duplicate observations repair on a clone while distinct history and strict validation remain', async () => {
+  const saved = await collectUploadAnalytics({ ...defaults, query: queryFixture() });
+  const observed = observation(saved.videos[0], '2026-10-19T12:00:00Z');
+  saved.videos[0].metadataHistory = [observed, jsonbRoundTrip(observed),
+    { ...observed, title: 'Different observed title at the same timestamp' }];
+  const canonical = jsonbRoundTrip(saved);
+  const repaired = validateUploadAnalytics(canonical);
+  assert.equal(canonical.videos[0].metadataHistory.length, 3, 'stored input is never mutated');
+  assert.equal(repaired.videos[0].metadataHistory.length, 2);
+  assert.equal(repaired.videos[0].metadataHistory[1].title, 'Different observed title at the same timestamp');
+  assert.deepEqual(validateUploadAnalytics(jsonbRoundTrip(repaired)), jsonbRoundTrip(repaired));
+  for (const change of [
+    value => { value.videos[0].metadataHistory[1].token = 'secret'; },
+    value => { value.videos[0].metadataHistory[1].capturedAt = '2026-10-21T12:00:00Z'; },
+    value => { value.videos[0].metadataHistory[1].thumbnail = 'https://example.com/secret.jpg'; },
+    value => { value.videos[0].daily.report.rows[0].views = -1; },
+  ]) {
+    const invalid = structuredClone(canonical);
+    change(invalid);
+    assert.throws(() => validateUploadAnalytics(invalid));
+  }
+  const refreshed = await collectUploadAnalytics({ ...defaults, capturedAt: '2026-10-21T12:00:00Z',
+    previous: canonical, query: queryFixture({ fail: 'retention' }) });
+  assert.equal(refreshed.videos[0].metadataHistory.length, 3);
+  assert.equal(refreshed.videos[0].retention.status, 'failed-retained');
+  assert.equal(refreshed.videos[0].retention.report.capturedAt, defaults.capturedAt);
+});
