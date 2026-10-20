@@ -1,3 +1,5 @@
+import { buildAllSocialAnalytics } from '/lib/sponsor-aggregate.mjs';
+
 const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, character =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
 const number = value => Number.isFinite(value) ? new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 }).format(value) : '—';
@@ -127,7 +129,7 @@ function sourceSummary() {
   }).join('')}</div>`;
 }
 function sourceTabs() {
-  return `<div class="yeet-platform-tabs" role="group" aria-label="Select reporting platform">${socialPlatforms.map(platform => `<button type="button" data-yeet-source="${platform.id}" aria-pressed="${platform.id === selectedSource}">${platform.label}</button>`).join('')}</div>`;
+  return `<div class="yeet-platform-tabs" role="group" aria-label="Select reporting platform">${[{ id: 'all', label: 'All socials' }, ...socialPlatforms].map(platform => `<button type="button" data-yeet-source="${platform.id}" aria-pressed="${platform.id === selectedSource}">${platform.label}</button>`).join('')}</div>`;
 }
 
 const icons = {
@@ -330,8 +332,9 @@ function refreshOutcome(result) {
     : `YouTube could not be refreshed. Saved data is still shown.${retryTime(result.retryAt)}` };
 }
 
-let report = null, growthDays = 7, refreshing = false, refreshMessage = '', selectedSource = 'youtube-longform';
+let report = null, growthDays = 7, refreshing = false, refreshMessage = '', selectedSource = 'all';
 let studioMetric = 'views', studioDays = 90, audiencePopulation = 'viewers';
+let allPeriod = '7d', allMetric = 'views';
 const source = () => report?.sources?.find(item => item.id === selectedSource);
 function renderRefresh() {
   const host = document.querySelector('#yeet-refresh');
@@ -475,7 +478,115 @@ function nativeAudienceContent(audience) {
   return `<div class="yeet-audience-grid"><article class="yeet-panel yeet-country-panel"><div class="yeet-panel-heading"><div><h3>Top countries</h3><p>${caption}</p></div></div>${bars(audience.country, 'country')}</article><div class="yeet-demographic-panels"><article class="yeet-panel"><div class="yeet-panel-heading"><div><h3>Age</h3><p>${caption}</p></div></div>${bars(audience.age, 'age')}</article><article class="yeet-panel"><div class="yeet-panel-heading"><div><h3>Gender</h3></div></div>${bars(audience.gender, 'gender')}</article></div></div><p class="yeet-audience-note">Share of reported Instagram followers within each breakdown. Small groups may be withheld. ${escapeHTML(audience.scope || '')}</p>`;
 }
 
+const allPlatformColours = { 'youtube-longform': '#db0b19', youtube: '#db0b19', instagram: '#8a597e', tiktok: '#248b83' };
+function allPlatformColour(id) { return allPlatformColours[id] || '#8c8172'; }
+
+function allReportedChart(rows, platforms, metricLabel, cumulative = false) {
+  if (!rows.some(row => Number.isFinite(row.total))) return '<div class="yeet-no-data">No daily values have been returned for this period.</div>';
+  const sidebar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar')) || 0;
+  const pageWidth = document.querySelector('.yeet-page')?.clientWidth || window.innerWidth - sidebar;
+  const width = Math.max(270, Math.min(1300, pageWidth - 70)), height = 295;
+  const left = width < 400 ? 43 : 58, right = 14, top = 18, bottom = 38;
+  const layers = platforms.map(platform => ({ ...platform, points: [] }));
+  const plotted = rows.map(row => {
+    let positive = 0, negative = 0;
+    layers.forEach(layer => {
+      const value = row.values[layer.id];
+      if (!Number.isFinite(value)) { layer.points.push({ date: row.date, value: null }); return; }
+      const base = cumulative ? 0 : value < 0 ? negative : positive;
+      layer.points.push({ date: row.date, value, lower: base, upper: base + value });
+      if (value < 0) negative += value; else positive += value;
+    });
+    return { ...row, positive, negative };
+  });
+  const min = Math.min(0, ...plotted.map(row => row.negative)), max = Math.max(1, ...plotted.map(row => row.positive), ...rows.map(row => Number.isFinite(row.total) ? row.total : 0));
+  const first = Date.parse(rows[0].date), last = Date.parse(rows.at(-1).date);
+  const x = day => left + (Date.parse(day) - first) / Math.max(86_400_000, last - first) * (width - left - right);
+  const y = value => top + (1 - (value - min) / (max - min)) * (height - top - bottom);
+  const segments = points => {
+    const result = []; let group = [];
+    for (const point of points) {
+      if (!Number.isFinite(point.value)) { if (group.length) result.push(group); group = []; }
+      else group.push(point);
+    }
+    if (group.length) result.push(group);
+    return result;
+  };
+  const totalPoints = rows.map(row => ({ date: row.date, value: row.total }));
+  const indexes = [0, Math.floor((rows.length - 1) / 2), rows.length - 1].filter((value, index, values) => values.indexOf(value) === index);
+  return `<svg class="yeet-all-chart" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="all-chart-title all-chart-description"><title id="all-chart-title">${cumulative ? 'Cumulative reported' : 'Combined reported'} ${metricLabel.toLowerCase()} ${cumulative ? 'over available history' : 'by day'}</title><desc id="all-chart-description">${cumulative ? 'Cumulative reported lines' : 'Stacked reported activity'} from ${platforms.map(platform => escapeHTML(platform.label)).join(' and ')}, ${date(rows[0].date)} to ${date(rows.at(-1).date)}. Missing source values remain unavailable.</desc>${[0, .25, .5, .75, 1].map(part => {
+    const value = min + (max - min) * part;
+    return `<line x1="${left}" x2="${width - right}" y1="${y(value)}" y2="${y(value)}" class="yeet-grid-line"/><text x="${left - 10}" y="${y(value) + 4}" text-anchor="end">${compact(value)}</text>`;
+  }).join('')}${layers.map(layer => segments(layer.points).map(group => `<path fill="${allPlatformColour(layer.id)}" fill-opacity="${cumulative ? '.12' : '.7'}" d="M${group.map(point => `${x(point.date)},${y(point.upper)}`).join(' L')} L${[...group].reverse().map(point => `${x(point.date)},${y(point.lower)}`).join(' L')}Z"/>${cumulative ? `<path fill="none" stroke="${allPlatformColour(layer.id)}" stroke-width="2" d="M${group.map(point => `${x(point.date)},${y(point.value)}`).join(' L')}"/>` : ''}`).join('')).join('')}${segments(totalPoints).map(group => `<path d="M${group.map(point => `${x(point.date)},${y(point.value)}`).join(' L')}" class="yeet-all-total-line" ${cumulative ? 'stroke-dasharray="6 4"' : ''}/>`).join('')}${rows.map(row => `<rect x="${x(row.date) - Math.max(3, (width - left - right) / rows.length / 2)}" y="${top}" width="${Math.max(6, (width - left -right) / rows.length)}" height="${height - top - bottom}" class="yeet-all-chart-hit"><title>${date(row.date)} · ${number(row.total)} total ${metricLabel.toLowerCase()}${platforms.map(platform => ` · ${platform.label}: ${number(row.values[platform.id])}`).join('')}</title></rect>`).join('')}${indexes.map((index, order) => `<text x="${x(rows[index].date)}" y="${height - 10}" text-anchor="${order === 0 ? 'start' : order === indexes.length - 1 ? 'end' : 'middle'}">${shortDate(rows[index].date)}</text>`).join('')}</svg>`;
+}
+
+export function allSocialChartRows(performance, platforms, metric, cumulative = false) {
+  let reported = 0;
+  const sums = Object.fromEntries(platforms.map(platform => [platform.id, 0]));
+  return performance.daily.map(row => {
+    const reportedValue = row[metric === 'views' ? 'reportedViews' : 'reportedEngagement'];
+    const values = Object.fromEntries(platforms.map(platform => {
+      const value = row.byPlatform?.[platform.id]?.[metric];
+      if (!Number.isFinite(value)) return [platform.id, null];
+      sums[platform.id] += value;
+      return [platform.id, cumulative ? sums[platform.id] : value];
+    }));
+    if (Number.isFinite(reportedValue)) reported += reportedValue;
+    return { date: row.date, total: cumulative ? Number.isFinite(reportedValue) ? reported : null : row[metric], values };
+  });
+}
+
+function allMixChart(platforms, valueKey, total, label) {
+  let offset = 0;
+  const arcs = platforms.filter(platform => Number.isFinite(platform[valueKey]) && platform[valueKey] > 0).map(platform => {
+    const share = total > 0 ? platform[valueKey] / total * 100 : 0, start = offset;
+    offset += share;
+    return `<circle cx="70" cy="70" r="52" fill="none" stroke="${allPlatformColour(platform.id)}" stroke-width="14" pathLength="100" stroke-dasharray="${share} ${100 - share}" stroke-dashoffset="${-start}" transform="rotate(-90 70 70)"/>`;
+  });
+  return `<div class="yeet-all-mix"><svg viewBox="0 0 140 140" role="img" aria-label="${escapeHTML(label)} by platform"><circle cx="70" cy="70" r="52" fill="none" stroke="#eadfce" stroke-width="14"/>${arcs.join('')}<text x="70" y="68" text-anchor="middle" class="yeet-all-donut-value">${compact(total)}</text><text x="70" y="85" text-anchor="middle" class="yeet-all-donut-label">${escapeHTML(label)}</text></svg><div class="yeet-all-mix-legend">${platforms.map(platform => `<div><i style="background:${allPlatformColour(platform.id)}"></i><span>${escapeHTML(platform.label)}</span><strong>${compact(platform[valueKey])}</strong><small>${total > 0 && Number.isFinite(platform[valueKey]) ? `${number(platform[valueKey] / total * 100)}%` : 'Unavailable'}</small></div>`).join('')}</div></div>`;
+}
+
+function allComparison(comparison) {
+  if (!comparison?.complete) return '';
+  const value = comparison.percent;
+  if (!Number.isFinite(value)) return '';
+  return `<small class="yeet-change ${value > 0 ? 'positive' : value < 0 ? 'negative' : 'neutral'}">${value > 0 ? '↗ +' : value < 0 ? '↘ ' : ''}${number(value)}% vs previous period</small>`;
+}
+
+function allAudienceProfile(category, estimateLabel) {
+  const rows = category?.rows || [];
+  return `<article class="yeet-panel"><div class="yeet-panel-heading"><div><h3>${escapeHTML(category?.label || 'Audience')}</h3></div><span class="yeet-all-estimate">${estimateLabel}</span></div>${rows.length ? studioPercentageBars(rows) : '<p class="yeet-all-no-audience">No comparable viewer profile has been returned.</p>'}<p class="yeet-all-profile-note">${escapeHTML(category?.note || '')}</p><div class="yeet-all-source-legend">${(category?.byPlatform || []).map(platform => `<span><i style="background:${allPlatformColour(platform.id)}"></i>${escapeHTML(platform.label)} · ${escapeHTML(rangeLabel(platform.dateRange))}</span>`).join('')}</div></article>`;
+}
+
+function allCountryProfile(category) {
+  const rows = (category?.rows || []).slice(0, 8);
+  return `<article class="yeet-panel yeet-country-panel"><div class="yeet-panel-heading"><div><h3>${escapeHTML(category?.label || 'Top countries')}</h3></div></div>${rows.length ? `<div class="yeet-all-audience-bars">${rows.map(row => `<div class="yeet-all-audience-row"><div><span>${escapeHTML(countryName(row.label))}</span></div><div class="yeet-all-audience-tracks">${row.values.map(value => {
+    const formatted = studioPercentage(value);
+    return `<div class="yeet-all-country-series"><div><i style="background:${allPlatformColour(value.id)}"></i><span>${escapeHTML(value.label)}</span><strong>${escapeHTML(formatted.label)}</strong></div><div class="yeet-all-audience-track ${formatted.threshold ? 'is-threshold' : ''}"><i style="width:${formatted.width}%;background:${allPlatformColour(value.id)}" title="${escapeHTML(`${value.label}: ${formatted.label}${value.unit ? ` ${value.unit}` : ''}`)}"></i></div></div>`;
+  }).join('')}</div></div>`).join('')}</div>` : '<p class="yeet-all-no-audience">Geographic reports are not available yet.</p>'}<p class="yeet-all-profile-note">${escapeHTML(category?.note || '')}</p><div class="yeet-all-source-legend">${(category?.byPlatform || []).map(platform => `<span><i style="background:${allPlatformColour(platform.id)}"></i>${escapeHTML(platform.label)} · ${escapeHTML(rangeLabel(platform.dateRange))}</span>`).join('')}</div></article>`;
+}
+
+function renderAllSocials() {
+  const model = buildAllSocialAnalytics(report, allPeriod);
+  const { headlines, performance, engagement, platforms: allPlatforms, audience, coverage } = model;
+  const platforms = allPlatforms.filter(platform => platform.available !== false &&
+    (Number.isFinite(platform.periodViews) || Number.isFinite(platform.periodEngagement)));
+  const metricLabel = allMetric === 'views' ? 'Views' : 'Engagement';
+  const rows = allSocialChartRows(performance, platforms, allMetric, allPeriod === 'all');
+  const periodViews = platforms.reduce((sum, platform) => sum + (Number.isFinite(platform.periodViews) ? platform.periodViews : 0), 0);
+  const reactions = [['Likes', engagement.likes], ['Comments', engagement.comments], ['Shares', engagement.shares]];
+  const reactionMax = Math.max(1, ...reactions.map(([, value]) => Number.isFinite(value) ? value : 0));
+  const labels = coverage.included.join(' + ');
+  const panel = `<section class="yeet-panel yeet-all-performance"><div class="yeet-all-panel-heading"><div><h2>Performance over time</h2><p>${escapeHTML(rangeLabel(performance.dateRange))}</p></div><div class="yeet-all-period-value"><div><strong>${compact(performance.totals.views)}</strong><span>reported views</span>${allComparison(performance.comparison?.views)}</div><div><strong>${compact(performance.totals.engagement)}</strong><span>recorded engagement</span>${allComparison(performance.comparison?.engagement)}</div></div></div><div class="yeet-all-controls"><div class="yeet-all-range" role="group" aria-label="All socials reporting period">${[['7d', '7D'], ['30d', '30D'], ['all', 'ALL TIME']].map(([value, label]) => `<button type="button" data-all-period="${value}" aria-pressed="${allPeriod === value}">${label}</button>`).join('')}</div><div class="segmented" role="group" aria-label="All socials graph metric">${[['views', 'Views'], ['engagement', 'Engagement']].map(([value, label]) => `<button type="button" data-all-metric="${value}" aria-pressed="${allMetric === value}">${label}</button>`).join('')}</div></div><div id="yeet-all-history-chart">${allReportedChart(rows, platforms, metricLabel, allPeriod === 'all')}</div><div class="yeet-all-chart-legend">${platforms.map(platform => `<span><i style="background:${allPlatformColour(platform.id)}"></i>${escapeHTML(platform.label)}</span>`).join('')}<span><i style="background:var(--ink)"></i>Combined${allPeriod === 'all' ? ' · reported' : ''}</span></div><p class="yeet-chart-note">${escapeHTML(coverage.chartNote)}${coverage.noDaily?.length ? ` ${escapeHTML(coverage.noDaily.join(', '))}: daily reports not yet available.` : ''}</p></section>`;
+  const engagementPanels = `<div class="yeet-all-bottom-grid"><article class="yeet-panel"><div class="yeet-panel-heading"><div><h3>Views by platform</h3><p>Reported activity in the selected dates</p></div></div>${allMixChart(platforms, 'periodViews', periodViews, 'views')}</article><article class="yeet-panel"><div class="yeet-panel-heading"><div><h3>How people engaged</h3><p>${escapeHTML(rangeLabel(performance.dateRange))}</p></div><strong>${compact(engagement.total)}<small>interactions</small></strong></div><div class="yeet-all-interactions">${reactions.map(([label, value]) => `<div class="yeet-all-reaction-row"><div><span>${label}</span><strong>${compact(value)}</strong></div><div class="yeet-all-reaction-track" aria-hidden="true"><i style="width:${Number.isFinite(value) ? Math.max(0, value) / reactionMax * 100 : 0}%;background:var(--red)"></i></div></div>`).join('')}</div><p class="yeet-chart-note">${escapeHTML(coverage.engagementNote)}</p></article></div>`;
+  document.querySelector('#workspace').innerHTML = `${sidebar()}<div class="app yeet-app"><header class="topbar"><div class="yeet-topbar-title"><div class="yeet-header-logo"><img src="/assets/yeet-logo.svg" width="1561" height="417" alt="YEET"></div><span>Performance report</span></div><div class="top-actions"><span id="yeet-refresh"></span></div></header><main id="main" class="yeet-page"><div class="yeet-page-heading"><div><p class="yeet-eyebrow">SCRAN & PINTS × YEET</p><h1>All socials.</h1></div><span class="yeet-source-pill">${escapeHTML(labels)}</span></div><div class="yeet-platform-heading">${sourceTabs()}<span>Combined performance</span></div><section class="yeet-section" aria-labelledby="yeet-all-time"><div class="yeet-section-heading"><div><span class="yeet-section-number">01</span><h2 id="yeet-all-time">All-time performance</h2></div></div><div class="yeet-stats-grid yeet-all-headlines">${metricCard('Public views', headlines.views, 'All-time reported public counters')}${metricCard('Account followers', headlines.followers, 'Combined accounts · not unique people')}${metricCard('Recorded engagement', headlines.engagement, 'Public likes, comments and available shares')}${metricCard('Public uploads', headlines.uploads, 'YouTube includes Shorts')}</div><p class="yeet-all-coverage">${escapeHTML(coverage.counterNote)} ${escapeHTML(allPlatforms.filter(platform => platform.available).map(platform => `${platform.label}: ${date(platform.capturedAt)}`).join(' · '))}.${coverage.missing.length ? ` ${escapeHTML(coverage.missing.join(', '))} not connected.` : ''}</p>${panel}</section><section class="yeet-section" aria-labelledby="yeet-all-engagement"><div class="yeet-section-heading"><div><span class="yeet-section-number">02</span><h2 id="yeet-all-engagement">Views & engagement</h2></div></div>${engagementPanels}</section><section class="yeet-section" aria-labelledby="yeet-audience"><div class="yeet-section-heading"><div><span class="yeet-section-number">03</span><h2 id="yeet-audience">${escapeHTML(audience.label)}</h2></div></div><p class="yeet-all-profile-note">${escapeHTML(audience.note)}</p><div class="yeet-all-audience-grid">${allCountryProfile(audience.country)}<div class="yeet-all-audience-side">${allAudienceProfile(audience.age, 'Adults · channel average')}${allAudienceProfile(audience.gender, 'Channel average')}</div></div></section><footer class="yeet-footer"><p>${escapeHTML(coverage.note)}</p><a href="https://scranpints.com" target="_blank" rel="noreferrer">scranpints.com ↗</a></footer></main></div>`;
+  renderRefresh(); bindPlatformTabs();
+  document.querySelectorAll('[data-all-period]').forEach(button => button.addEventListener('click', () => { allPeriod = button.dataset.allPeriod; render(); }));
+  document.querySelectorAll('[data-all-metric]').forEach(button => button.addEventListener('click', () => { allMetric = button.dataset.allMetric; render(); }));
+}
+
 function render() {
+  if (selectedSource === 'all') { renderAllSocials(); return; }
   const channel = source() || { id: selectedSource }, performance = sourcePerformance(channel);
   const platform = socialPlatforms.find(item => item.id === selectedSource);
   document.querySelector('#workspace').innerHTML = `${sidebar()}<div class="app yeet-app"><header class="topbar"><div class="yeet-topbar-title"><div class="yeet-header-logo"><img src="/assets/yeet-logo.svg" width="1561" height="417" alt="YEET"></div><span>Performance report</span></div><div class="top-actions"><span id="yeet-refresh"></span></div></header><main id="main" class="yeet-page"><div class="yeet-page-heading"><div><p class="yeet-eyebrow">SCRAN & PINTS × YEET</p><h1>The numbers.</h1></div><span class="yeet-source-pill">YouTube · Instagram · TikTok</span></div>${sourceSummary()}<div class="yeet-platform-heading">${sourceTabs()}<span>${escapeHTML(platform.detail)}</span></div><section aria-labelledby="yeet-all-time" class="yeet-section">${allTimeContent(channel, performance)}</section><section id="yeet-growth" class="yeet-section" aria-label="Growth">${growthContent(performance)}</section><section class="yeet-section" aria-labelledby="yeet-audience"><div class="yeet-section-heading"><div><span class="yeet-section-number">03</span><h2 id="yeet-audience">Audience</h2></div></div>${audienceContent(channel)}</section><footer class="yeet-footer"><p>Each platform shows its own reporting coverage. YouTube includes Shorts; views and followers are not unique people across accounts.</p><a href="https://scranpints.com" target="_blank" rel="noreferrer">scranpints.com ↗</a></footer></main></div>`;
@@ -483,13 +594,17 @@ function render() {
   document.querySelector('#yeet-studio-metric')?.addEventListener('change', event => { studioMetric = event.target.value; render(); });
   document.querySelector('#yeet-studio-period')?.addEventListener('change', event => { studioDays = Number(event.target.value); render(); });
   document.querySelector('#yeet-audience-population')?.addEventListener('change', event => { audiencePopulation = event.target.value; render(); });
+  bindPlatformTabs();
+  window.SPSelect?.refresh(document.querySelector('#workspace'));
+}
+
+function bindPlatformTabs() {
   document.querySelectorAll('[data-yeet-source]').forEach(button => button.addEventListener('click', () => {
     selectedSource = button.dataset.yeetSource;
     if (!(source()?.studioSupplement ? [7, 28, 90, 365] : [7, 14, 28]).includes(growthDays)) growthDays = 7;
     render();
     document.querySelector('.yeet-platform-tabs button[aria-pressed="true"]')?.focus({ preventScroll: true });
   }));
-  window.SPSelect?.refresh(document.querySelector('#workspace'));
 }
 
 function bindGrowth() {
@@ -511,6 +626,7 @@ let resizeFrame;
 window.addEventListener('resize', () => {
   clearTimeout(resizeFrame);
   resizeFrame = setTimeout(() => {
+    if (report && selectedSource === 'all') { renderAllSocials(); return; }
     const chart = document.querySelector('#yeet-history-chart'), performance = sourcePerformance(source());
     if (chart && report) chart.innerHTML = performance?.studio
       ? cumulativeChart(metricPerformance(performance, studioMetric), { metric: studioMetric, days: studioDays, cumulative: false })

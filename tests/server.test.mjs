@@ -46,7 +46,7 @@ async function filesIn(directory) {
 test('public build contains reviewed Studio thumbnails, but no archive, screenshots or configuration', async () => {
   const files = await filesIn(PUBLIC_OUTPUT);
   const thumbnails = new Set(studioThumbnailAssets(snapshot));
-  for (const expected of ['index.html', 'sponsor.html', 'workshop.html', 'login.html', 'connections.html', 'public-report.json']) assert.ok(files.includes(expected));
+  for (const expected of ['index.html', 'sponsor.html', 'workshop.html', 'login.html', 'connections.html', 'public-report.json', 'lib/sponsor-aggregate.mjs']) assert.ok(files.includes(expected));
   for (const file of files) {
     assert.doesNotMatch(file, /(?:^|\/)(?:\.env|\.git|\.private|api|integrations|tests|scripts)(?:\/|\.|$)/);
     if (!thumbnails.has(file)) assert.doesNotMatch(file, /history|evidence|ab-tests|image-index|image-assets/);
@@ -64,7 +64,7 @@ test('public build contains reviewed Studio thumbnails, but no archive, screensh
 });
 
 test('HTTP public pages, current thumbnail and report remain readable without a session', async () => {
-  for (const path of ['/', '/sponsor.html', '/workshop.html', '/login.html', '/connections.html', '/api/report', '/api/workshop-data', '/api/connection-status', '/public-report.json', '/assets/history-CWBBRExPJ0I-p1.jpg', `/${snapshot.videos[0].thumb}`]) {
+  for (const path of ['/', '/sponsor.html', '/workshop.html', '/login.html', '/connections.html', '/api/report', '/api/workshop-data', '/api/connection-status', '/public-report.json', '/lib/sponsor-aggregate.mjs', '/assets/history-CWBBRExPJ0I-p1.jpg', `/${snapshot.videos[0].thumb}`]) {
     const response = await fetch(origin + path);
     assert.equal(response.status, 200, path);
     assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
@@ -92,7 +92,7 @@ test('HTTP private pages redirect and private data/assets refuse unauthenticated
 });
 
 test('HTTP root source files and traversal cannot escape the public build', async () => {
-  for (const path of ['/.env.local', '/.git/config', '/lib/auth.mjs', '/lib/cloud-store.mjs', '/supabase/provision.sql', '/scripts/build.mjs', '/README.md', '/integrations/campaigns.json', '/public-dist/index.html', '/assets/%252e%252e/data.json', '/%5c..%5c.env.local']) {
+  for (const path of ['/.env.local', '/.git/config', '/lib/auth.mjs', '/lib/cloud-store.mjs', '/supabase/provision.sql', '/scripts/build.mjs', '/README.md', '/integrations/campaigns.json', '/docs/YEET.md', '/lib/youtube-oauth.mjs', '/lib/instagram-oauth.mjs', '/lib/tiktok-oauth.mjs', '/lib/instagram-collector.mjs', '/public-dist/index.html', '/assets/%252e%252e/data.json', '/%5c..%5c.env.local']) {
     const response = await fetch(origin + path, { redirect: 'manual' });
     assert.equal(response.status, 404, path);
     assert.equal((await response.json()).error, 'not_found');
