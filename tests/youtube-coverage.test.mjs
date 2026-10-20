@@ -149,7 +149,7 @@ test('cloud sync records partial inventory as partial without losing available r
 });
 
 
-test('public API and exports use independent native counters and never fresh authorized Analytics', async () => {
+test('public counters remain independent of raw per-video Analytics and private evidence', async () => {
   const snapshot = discoveredSnapshot();
   snapshot.publicReport = publicYouTubeFixture();
   snapshot.videos[0].apiAggregate.views = 777777777;

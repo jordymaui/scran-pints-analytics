@@ -93,17 +93,20 @@ function analyticsTrend(rows, range, label, key, limit = 28, viewsOnly = false) 
     else points.push([x(index), y(row.views), row]);
   });
   if (points.length) segments.push(points);
-  const grid = [0, .5, 1].map(fraction => `<line x1="62" x2="852" y1="${y(maximum * fraction)}" y2="${y(maximum * fraction)}" stroke="#d8cbb8"/><text x="50" y="${y(maximum * fraction) + 4}" text-anchor="end">${number(maximum * fraction)}</text>`).join('');
-  const chart = present.length ? `<svg viewBox="0 0 900 245" role="img" aria-labelledby="${key}-title ${key}-description"><title id="${key}-title">${escapeHTML(label)} daily views</title><desc id="${key}-description">Returned daily views from ${series[0].day} to ${series.at(-1).day}. Missing dates are gaps. Exact values follow.</desc>${grid}${segments.map(segment => `<polyline points="${segment.map(point => point.slice(0, 2).join(',')).join(' ')}" fill="none" stroke="#db0b19" stroke-width="3"/>`).join('')}${series.length <= 90 ? segments.flat().map(([cx, cy, row]) => `<circle cx="${cx}" cy="${cy}" r="3" fill="#db0b19"><title>${row.day}: ${number(row.views)} views</title></circle>`).join('') : ''}<text x="62" y="235">${escapeHTML(date(series[0].day))}</text><text x="852" y="235" text-anchor="end">${escapeHTML(date(series.at(-1).day))}</text></svg>` : '<p class="empty">No views were returned for these dates.</p>';
+  const grid = [0, .5, 1].map(fraction => `<line x1="62" x2="852" y1="${y(maximum * fraction)}" y2="${y(maximum * fraction)}" stroke="#e5e3db"/><text x="50" y="${y(maximum * fraction) + 4}" text-anchor="end">${number(maximum * fraction)}</text>`).join('');
+  const chart = present.length ? `<svg viewBox="0 0 900 245" role="img" aria-labelledby="${key}-title ${key}-description"><title id="${key}-title">${escapeHTML(label)} daily views</title><desc id="${key}-description">Returned daily views from ${series[0].day} to ${series.at(-1).day}. Missing dates are gaps. Exact values follow.</desc>${grid}${segments.map(segment => `<polygon points="${segment[0][0]},205 ${segment.map(point => point.slice(0, 2).join(',')).join(' ')} ${segment.at(-1)[0]},205" fill="#c53529" opacity=".06"/><polyline points="${segment.map(point => point.slice(0, 2).join(',')).join(' ')}" fill="none" stroke="#c53529" stroke-width="2.5"/>`).join('')}${series.length <= 90 ? segments.flat().map(([cx, cy, row]) => `<circle cx="${cx}" cy="${cy}" r="3" fill="#c53529"><title>${row.day}: ${number(row.views)} views</title></circle>`).join('') : ''}<text x="62" y="235">${escapeHTML(date(series[0].day))}</text><text x="852" y="235" text-anchor="end">${escapeHTML(date(series.at(-1).day))}</text></svg>` : '<p class="empty">No views were returned for these dates.</p>';
   const fields = viewsOnly ? analyticsFields.slice(0, 1) : analyticsFields;
-  return `<div class="chart-panel analytics-trend"><div class="section-heading compact"><h4>${escapeHTML(label)} · daily views</h4><label>Chart dates<select data-trend-range="${key}"><option value="7" ${limit === 7 ? 'selected' : ''}>Last 7 dates</option><option value="28" ${limit === 28 ? 'selected' : ''}>Last 28 dates</option><option value="all" ${limit === null ? 'selected' : ''}>All dates · up to 5,000</option></select></label></div>${chart}<p class="note">${present.length} / ${series.length} dates have a returned view count. Gaps are unavailable, not zero. ${limit === null && series[0].day > range.start ? 'This long report shows its latest 5,000 calendar dates. ' : ''}This selector changes the chart and daily table only; aggregate cards keep their full stated window.</p><details class="analytics-daily"><summary>Exact daily values &amp; coverage</summary><div class="table-scroll" tabindex="0" role="region" aria-label="${escapeHTML(label)} daily values"><table><thead><tr><th scope="col">Date</th>${fields.map(field => `<th scope="col">${escapeHTML(field[1])}</th>`).join('')}<th scope="col">Coverage</th></tr></thead><tbody>${series.map(row => `<tr><td>${row.day}</td>${fields.map(field => `<td class="metric">${escapeHTML(metricValue(row, field))}</td>`).join('')}<td>${row.coverage}</td></tr>`).join('')}</tbody></table></div></details></div>`;
+  return `<div class="chart-panel analytics-trend"><div class="section-heading compact"><h4>${escapeHTML(label)} · daily views</h4><label>Chart dates<select data-trend-range="${key}"><option value="7" ${limit === 7 ? 'selected' : ''}>Last 7 dates</option><option value="28" ${limit === 28 ? 'selected' : ''}>Last 28 dates</option><option value="all" ${limit === null ? 'selected' : ''}>All dates · up to 5,000</option></select></label></div>${chart}<p class="note chart-coverage">${present.length} / ${series.length} dates returned · gaps are unavailable. ${limit === null && series[0].day > range.start ? 'Showing the latest 5,000 dates. ' : ''}Cards retain their stated full window.</p><details class="analytics-daily"><summary>Daily values &amp; coverage</summary><p class="note">The date selector changes this chart and table only. Missing dates are not zero.</p><div class="table-scroll" tabindex="0" role="region" aria-label="${escapeHTML(label)} daily values"><table><thead><tr><th scope="col">Date</th>${fields.map(field => `<th scope="col">${escapeHTML(field[1])}</th>`).join('')}<th scope="col">Coverage</th></tr></thead><tbody>${series.map(row => `<tr><td>${row.day}</td>${fields.map(field => `<td class="metric">${escapeHTML(metricValue(row, field))}</td>`).join('')}<td>${row.coverage}</td></tr>`).join('')}</tbody></table></div></details></div>`;
 }
 function renderChannelAnalytics() {
   const report = data.channelAnalytics;
   const fallbackStart = report?.coverage?.startBasis === 'earliest-known-public-upload';
-  const core = report ? `<article class="analytics-report"><div class="section-heading compact"><h3>YouTube channel · all formats</h3><span class="pill">Native channel aggregate</span></div><p class="note">${escapeHTML(reportDates(report))}</p>${metricLedger(analyticsMetrics(report.aggregate))}<p class="note">Source: YouTube Analytics API, unfiltered channel aggregate and daily reports. Includes all formats reported by YouTube. ${fallbackStart ? 'The window starts at the earliest known public upload; earlier channel history is not covered.' : 'The window starts at the channel creation date.'} These totals are supplied separately from the episode inventory and may include activity not represented in the current public upload list. Native average values are not recomputed from individual videos.</p><div id="channel-trend">${analyticsTrend(report.daily, report.dateRange, 'Channel', 'channel')}</div></article>`
+  const headlineKeys = ['views', 'watchHours', 'subscribersNet', 'averageViewDuration', 'averageViewPercentage', 'likes'];
+  const headlineFields = headlineKeys.map(key => analyticsFields.find(field => field[0] === key));
+  const otherFields = analyticsFields.filter(field => !headlineKeys.includes(field[0]));
+  const core = report ? `<article class="analytics-report channel-overview"><div class="section-heading compact"><h3>Channel · all formats</h3><span class="pill">YouTube Analytics</span></div><p class="note report-date">${escapeHTML(reportDates(report))}</p>${metricLedger(analyticsMetrics(report.aggregate), headlineFields)}<div id="channel-trend">${analyticsTrend(report.daily, report.dateRange, 'Channel', 'channel')}</div><details class="report-details"><summary>More metrics &amp; source details</summary>${metricLedger(analyticsMetrics(report.aggregate), otherFields)}<p class="note">Native channel aggregate and daily reports from the YouTube Analytics API. ${fallbackStart ? 'Coverage starts at the earliest known public upload; earlier channel history is excluded.' : 'Coverage starts at the channel creation date.'} Includes all formats and may include activity outside the public upload list. Channel totals and average values are supplied directly; episode and Shorts figures are not added to them.</p></details></article>`
     : '<div class="notice quiet"><strong>Channel Analytics has not been collected yet.</strong><p>After the channel owner connects YouTube reporting, refresh YouTube in Connections. The saved episode evidence remains available below.</p></div>';
-  $('#channel-analytics').innerHTML = `${core}<article class="analytics-report channel-breakdowns"><div class="section-heading compact"><h3>Where the views come from</h3><label>Channel breakdown<select id="channel-breakdown">${Object.entries(channelBreakdownViews).map(([id, view]) => `<option value="${id}">${escapeHTML(view.label)}</option>`).join('')}</select></label></div><div id="channel-breakdown-detail" aria-live="polite"></div></article>`;
+  $('#channel-analytics').innerHTML = `${core}<article class="analytics-report channel-breakdowns"><div class="section-heading compact"><h3>Audience &amp; traffic</h3><label>Breakdown<select id="channel-breakdown">${Object.entries(channelBreakdownViews).map(([id, view]) => `<option value="${id}">${escapeHTML(view.label)}</option>`).join('')}</select></label></div><div id="channel-breakdown-detail" aria-live="polite"></div></article>`;
   renderChannelBreakdown();
 }
 function breakdownDimension(value, key) {
@@ -274,9 +277,9 @@ function renderRetention(videos) {
   const top = Math.ceil(max * 4) / 4;
   const x = ratio => 54 + ratio * 840;
   const y = ratio => 235 - ratio / top * 200;
-  const grid = Array.from({ length: 5 }, (_, i) => i * top / 4).map(value => `<line x1="54" x2="894" y1="${y(value)}" y2="${y(value)}" stroke="#d8cbb8"/><text x="43" y="${y(value) + 4}" text-anchor="end">${number(value * 100)}%</text>`).join('');
+  const grid = Array.from({ length: 5 }, (_, i) => i * top / 4).map(value => `<line x1="54" x2="894" y1="${y(value)}" y2="${y(value)}" stroke="#e5e3db"/><text x="43" y="${y(value) + 4}" text-anchor="end">${number(value * 100)}%</text>`).join('');
   const labels = [0, .25, .5, .75, 1].map(value => `<text x="${x(value)}" y="258" text-anchor="middle">${value * 100}%</text>`).join('');
-  const paths = series.map((item, i) => `<polyline fill="none" stroke="${i ? '#171310' : '#db0b19'}" stroke-width="3" ${i ? 'stroke-dasharray="8 5"' : ''} points="${item.points.map(point => `${x(point.elapsedVideoTimeRatio).toFixed(2)},${y(point.audienceWatchRatio).toFixed(2)}`).join(' ')}"/>`).join('');
+  const paths = series.map((item, i) => `<polyline fill="none" stroke="${i ? '#222522' : '#c53529'}" stroke-width="3" ${i ? 'stroke-dasharray="8 5"' : ''} points="${item.points.map(point => `${x(point.elapsedVideoTimeRatio).toFixed(2)},${y(point.audienceWatchRatio).toFixed(2)}`).join(' ')}"/>`).join('');
   const samples = series.map(({ video, points }) => `${escapeHTML(video.name)}: ${points.length && video.retentionNear30Seconds?.audienceWatchRatio != null ? `${percent(video.retentionNear30Seconds.audienceWatchRatio * 100)} at ${number(video.retentionNear30Seconds.sampledSeconds, 1)}s` : 'no near-30-second sample collected'}`).join(' · ');
   const sources = series.map(({ video, points }) => points.length ? `${escapeHTML(video.name)}: curve captured ${escapeHTML(date(video.retentionSource?.capturedAt || data.capturedAt))}; queried through ${escapeHTML(date(video.retentionSource?.end || data.apiThrough))}${video.refreshReports?.retention === 'no-rows-retained-previous' ? ' · older curve retained because refresh returned no rows' : ''}` : `${escapeHTML(video.name)}: retention curve unavailable`).join(' · ');
   $('#retention-chart').innerHTML = `<svg viewBox="0 0 930 285" role="img" aria-labelledby="retention-title retention-description"><title id="retention-title">Audience retention: ${escapeHTML(videos.map(video => video.name).join(' compared with '))}</title><desc id="retention-description">Audience watch ratio over percentage through each video. Source: saved YouTube API retention export. These curves are not first ${windowDays} date results.</desc>${grid}${labels}${paths}<text x="474" y="280" text-anchor="middle">PROGRESS THROUGH VIDEO</text></svg><div class="chart-legend">${series.map(item => `<span><i aria-hidden="true"></i>${escapeHTML(item.video.name)}${!item.points.length ? ' · no curve collected' : ''}</span>`).join('')}</div><p class="note">API sample near 30 seconds: ${samples}. Studio’s 30-second card uses its own capture and may differ.</p><p class="note">${sources}. Retention reports do not return a daily completeness marker.</p>`;
@@ -286,10 +289,11 @@ function renderHeadToHead() {
   const videos = [videoFor($('#video-a').value), videoFor($('#video-b').value)];
   $('#video-cards').innerHTML = videos.map(studioCard).join('');
   renderRetention(videos);
-  $('#comparison-prompt').innerHTML = `<p><strong>QUESTION TO TAKE INTO THE NEXT EDIT</strong>${videos[0].id === videos[1].id ? 'Choose two different episodes to explore the differences.' : `Compare the promise in ${escapeHTML(videos[0].name)} with ${escapeHTML(videos[1].name)}: does each opening deliver what its title and thumbnail suggest? Note the exact moment and draft one change. Audience, video age and distribution can also explain differences.`}</p><button id="start-pair-experiment" class="button" type="button">Draft a test ↗</button>`;
+  $('#comparison-prompt').innerHTML = `<p><strong>Comparison notes</strong>${videos[0].id === videos[1].id ? 'Choose two different episodes to compare.' : `Compare ${escapeHTML(videos[0].name)} and ${escapeHTML(videos[1].name)}. Note differences in the opening, title and thumbnail. Audience, video age and distribution can also affect performance.`}</p><button id="start-pair-experiment" class="button" type="button">Draft a test ↗</button>`;
   $('#start-pair-experiment').addEventListener('click', () => {
     newExperiment(videos[0].id);
     $('#experiment-control').value = `${videos.map(video => { const pair = workshopPackage(video, data.capturedAt); return `${video.name}: ${pair.title}\nTitle captured ${date(pair.capturedAt)}${pair.hostedImage ? '; hosted thumbnail may change' : '; saved local thumbnail'}`; }).join('\nCompared with\n')}\nAPI through ${date(data.apiThrough)}; whole-video observations, not a controlled experiment.`;
+    selectStudioSection('notebook');
     $('#notebook').scrollIntoView({ behavior: 'smooth' });
     $('#experiment-hypothesis').focus({ preventScroll: true });
   });
@@ -543,6 +547,26 @@ async function importEntries(imported) {
   if (saved) setNotebookStatus(`Imported ${imported.length} experiments into the team notebook. ${merged.conflicts ? `${merged.conflicts} differing versions preserved as separate drafts.` : 'Identical existing drafts kept once.'}`);
 }
 
+const studioSections = new Set(['analytics', 'compare', 'packaging', 'metadata', 'notebook']);
+function selectStudioSection(requested, updateUrl = true) {
+  const selected = studioSections.has(requested) ? requested : 'analytics';
+  document.querySelectorAll('[data-studio-panel]').forEach(panel => { panel.hidden = panel.id !== selected; });
+  document.querySelectorAll('[data-studio-tab]').forEach(link => {
+    if (link.dataset.studioTab === selected) link.setAttribute('aria-current', 'location');
+    else link.removeAttribute('aria-current');
+  });
+  if (updateUrl) history.replaceState(null, '', `#${selected}`);
+  return selected;
+}
+function initializeStudioNavigation() {
+  selectStudioSection(location.hash.slice(1), false);
+  document.querySelectorAll('[data-studio-tab]').forEach(link => link.addEventListener('click', event => {
+    event.preventDefault();
+    selectStudioSection(link.dataset.studioTab);
+  }));
+  window.addEventListener('hashchange', () => selectStudioSection(location.hash.slice(1), false));
+}
+
 function initialize() {
   tests = groupTests(data.history);
   const options = data.videos.map(video => `<option value="${escapeHTML(video.id)}">${escapeHTML(video.name)}</option>`).join('');
@@ -550,7 +574,7 @@ function initialize() {
   $('#packaging-video').insertAdjacentHTML('beforeend', options);
   $('#video-b').value = data.videos[Math.min(2, data.videos.length - 1)].id;
   const sourceText = `Saved reporting evidence · API through ${date(data.apiThrough)} · collected ${date(data.capturedAt)} · historical Studio cards ${date(data.studioCapturedAt)}`;
-  $('#source-stamp').textContent = sourceText;
+  $('#source-stamp').textContent = `Through ${date(data.apiThrough)} · Updated ${date(data.capturedAt)}`;
   $('#method-dates').textContent = sourceText;
   initializeAnalytics();
   renderSummary();
@@ -590,12 +614,15 @@ function initialize() {
       $('#experiment-change').value = 'Title + thumbnail pairing';
       $('#experiment-control').value = `${group.episode} / ${group.testId}\n${group.window || 'Exact run dates not recorded'}\nCaptured ${group.observedAt || 'date not recorded'}\n${group.status || group.result || 'No result recorded'}\n${group.variants.map(variant => `${variant.title || 'Title unknown'}: ${percent(variant.metrics?.watchTimeSharePct)} watch-time share`).join('\n')}`;
       $('#experiment-metric').value = 'Native test watch-time share for the whole title/image pairing. Keep the full test dates and final status. Do not infer variant CTR or attribute the result to one element.';
+      selectStudioSection('notebook');
       $('#notebook').scrollIntoView({ behavior: 'smooth' });
       $('#experiment-hypothesis').focus({ preventScroll: true });
     }
   });
   $('#close-image').addEventListener('click', () => $('#image-dialog').close());
   $('#image-dialog').addEventListener('click', event => { if (event.target === $('#image-dialog')) $('#image-dialog').close(); });
+  initializeStudioNavigation();
+  $('#team-sign-out').hidden = false;
   $('#load-state').hidden = true;
   $('#workshop-content').hidden = false;
 }
@@ -604,8 +631,8 @@ async function load() {
   try {
     const response = await fetch('/api/workshop-data', { credentials: 'same-origin', cache: 'no-store' });
     if (response.status === 401 || response.status === 403) {
-      $('#source-stamp').textContent = 'Private team workshop · sign in to view the saved evidence';
-      $('#load-state').innerHTML = '<strong>This is the team workshop.</strong><br>Sign in with an authorised team account to open analytics, packaging history and the experiment notebook.<p><a class="button" href="/login.html?next=%2Fworkshop.html">Sign in to the workshop ↗</a></p>';
+      $('#source-stamp').textContent = 'Sign in to view team analytics';
+      $('#load-state').innerHTML = '<strong>Sign in to Studio</strong><p>Use an authorised team account to open analytics, packaging history and the notebook.</p><p><a class="button" href="/login.html?next=%2Fworkshop.html">Sign in ↗</a></p>';
       return;
     }
     if (!response.ok) throw new Error(`The data service returned ${response.status}.`);
@@ -615,7 +642,7 @@ async function load() {
   } catch (error) {
     $('#source-stamp').textContent = 'Saved evidence is currently unavailable';
     $('#load-state').setAttribute('role', 'alert');
-    $('#load-state').innerHTML = `<strong>The workshop could not load its evidence.</strong><br>${escapeHTML(error.message)}<p>The saved report remains unchanged. Try again when the reporting service is available.</p><button type="button" class="button" id="retry-load">Try again</button>`;
+    $('#load-state').innerHTML = `<strong>Studio could not load the saved report.</strong><br>${escapeHTML(error.message)}<p>Please try again when the reporting service is available.</p><button type="button" class="button" id="retry-load">Try again</button>`;
     $('#retry-load').addEventListener('click', load);
   }
 }
