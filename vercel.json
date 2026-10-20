@@ -1,6 +1,28 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "public-dist",
+  "cleanUrls": false,
+  "functions": {
+    "api/private.mjs": {
+      "includeFiles": "{data.json,image-index.json,image-assets.js,review-room.html,title-table.html,thumbnail-lab.html,winners-losers.html,leaderboard.html,app.js,labs.js,winners.js,leaderboard.js,menu.js,style.css,mobile.css,labs.css,winners.css,leaderboard.css,assets/**}",
+      "maxDuration": 30
+    },
+    "api/workshop-data.mjs": { "includeFiles": "{data.json,integrations/social.json,integrations/campaigns.json}", "maxDuration": 60 },
+    "api/report.mjs": { "includeFiles": "{data.json,integrations/social.json,integrations/campaigns.json}", "maxDuration": 60 },
+    "api/sync.mjs": { "includeFiles": "data.json", "maxDuration": 300 },
+    "api/workshop-notebook.mjs": { "maxDuration": 60 },
+    "api/connection-status.mjs": { "maxDuration": 60 },
+    "api/connections/youtube.mjs": { "maxDuration": 60 },
+    "api/auth/*.mjs": { "maxDuration": 30 }
+  },
+  "crons": [
+    { "path": "/api/sync?source=youtube", "schedule": "0 4 * * *" },
+    { "path": "/api/sync?source=youtube-shorts", "schedule": "0 5 * * *" },
+    { "path": "/api/sync?source=instagram", "schedule": "0 6 * * *" },
+    { "path": "/api/sync?source=tiktok", "schedule": "0 7 * * *" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -18,18 +40,15 @@
     {
       "source": "/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
-        }
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
       ]
     },
     {
-      "source": "/assets/(.*)",
+      "source": "/public-report.json",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=86400"
+          "value": "no-store"
         }
       ]
     },
@@ -41,33 +60,27 @@
           "value": "public, max-age=31536000, immutable"
         }
       ]
-    },
-    {
-      "source": "/assets/optimized/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/data.json",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store"
-        }
-      ]
-    },
-    {
-      "source": "/image-index.json",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "no-store"
-        }
-      ]
     }
+  ],
+  "rewrites": [
+    { "source": "/review-room.html", "destination": "/api/private?path=review-room.html" },
+    { "source": "/title-table.html", "destination": "/api/private?path=title-table.html" },
+    { "source": "/thumbnail-lab.html", "destination": "/api/private?path=thumbnail-lab.html" },
+    { "source": "/winners-losers.html", "destination": "/api/private?path=winners-losers.html" },
+    { "source": "/leaderboard.html", "destination": "/api/private?path=leaderboard.html" },
+    { "source": "/data.json", "destination": "/api/private?path=data.json" },
+    { "source": "/image-index.json", "destination": "/api/private?path=image-index.json" },
+    { "source": "/image-assets.js", "destination": "/api/private?path=image-assets.js" },
+    { "source": "/app.js", "destination": "/api/private?path=app.js" },
+    { "source": "/labs.js", "destination": "/api/private?path=labs.js" },
+    { "source": "/winners.js", "destination": "/api/private?path=winners.js" },
+    { "source": "/leaderboard.js", "destination": "/api/private?path=leaderboard.js" },
+    { "source": "/menu.js", "destination": "/api/private?path=menu.js" },
+    { "source": "/style.css", "destination": "/api/private?path=style.css" },
+    { "source": "/mobile.css", "destination": "/api/private?path=mobile.css" },
+    { "source": "/labs.css", "destination": "/api/private?path=labs.css" },
+    { "source": "/winners.css", "destination": "/api/private?path=winners.css" },
+    { "source": "/leaderboard.css", "destination": "/api/private?path=leaderboard.css" },
+    { "source": "/assets/:path*", "destination": "/api/private?path=assets/:path*" }
   ]
 }

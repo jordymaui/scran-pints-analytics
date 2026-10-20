@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#db0b19">
+  <title>Connections · Scran &amp; Pints</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="stylesheet" href="/workshop.css">
+  <link rel="stylesheet" href="/connections.css">
+  <script type="module" src="/connections.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to connections</a>
+  <div class="edition"><span>SCRAN &amp; PINTS / THE REPORTING DESK</span><span>PRIVATE TEAM ACCESS</span></div>
+  <header class="site-header">
+    <a href="/" aria-label="Scran and Pints home"><img src="/assets/optimized/3f526c1560f0-480.webp" width="166" height="76" alt="Scran &amp; Pints"></a>
+    <nav aria-label="Main navigation"><a href="/">Public dashboard</a><a href="/sponsor.html">YEET partner view</a><a href="/workshop.html">Workshop</a><a href="/connections.html" aria-current="page">Connections</a></nav>
+  </header>
+  <main id="main">
+    <section class="connection-intro"><div><p class="eyebrow">GET THE NUMBERS FROM THE SOURCE</p><h1>The reporting desk.</h1><p>Connect the accounts. Collect a dated report. Keep the team, the audience and YEET looking at the same evidence.</p></div><div class="desk-stamp"><span>READ ONLY</span><strong>Numbers in.<br>Insight out.</strong></div></section>
+    <div id="connection-state" class="notice" role="status">Checking the team’s reporting connections…</div>
+    <div id="connection-content" hidden>
+      <div id="connection-message" class="notice" role="status" hidden></div>
+      <div class="connection-toolbar"><p>Connection status is checked from the server. Each report keeps its own collection date.</p><button class="button secondary" id="reload-status" type="button">Check status ↻</button></div>
+      <section class="connection-grid" aria-label="Social reporting sources">
+        <article class="connection-card" data-source="youtube">
+          <div class="connection-card-top"><span class="source-number">01</span><span class="pill" data-field="status">Checking</span></div>
+          <h2>YouTube</h2><p class="connection-subtitle">Full episodes / the workshop</p>
+          <p>Views, watch time, retention and traffic alongside dated titles, descriptions, tags and thumbnail URLs for the selected episodes.</p>
+          <dl data-field="details"></dl>
+          <p class="connection-help" data-field="help"></p>
+          <div class="connection-actions"><form action="/api/connections/youtube?action=start" method="post"><button class="button" id="connect-youtube" type="submit" disabled>Connect YouTube ↗</button></form><button class="button secondary" data-sync="youtube" type="button" disabled>Refresh episodes</button></div>
+        </article>
+        <article class="connection-card" data-source="youtube-shorts">
+          <div class="connection-card-top"><span class="source-number">02</span><span class="pill" data-field="status">Checking</span></div>
+          <h2>YouTube Shorts</h2><p class="connection-subtitle">Short form / YouTube Analytics</p>
+          <p>A separate Shorts report, classified by YouTube’s content type. Views and engaged views remain distinct metrics.</p>
+          <dl data-field="details"></dl>
+          <p class="connection-help" data-field="help"></p>
+          <div class="connection-actions"><button class="button secondary" data-sync="youtube-shorts" type="button" disabled>Refresh Shorts</button></div>
+        </article>
+        <article class="connection-card" data-source="instagram">
+          <div class="connection-card-top"><span class="source-number">03</span><span class="pill" data-field="status">Checking</span></div>
+          <h2>Instagram</h2><p class="connection-subtitle">Account &amp; content insights</p>
+          <p>Instagram reporting needs the correct professional account, a Meta app and approved read access. Availability depends on the account and granted permissions.</p>
+          <dl data-field="details"></dl>
+          <p class="connection-help" data-field="help"></p>
+          <div class="connection-actions"><button class="button secondary" data-sync="instagram" type="button" disabled>Refresh Instagram</button></div>
+        </article>
+        <article class="connection-card" data-source="tiktok">
+          <div class="connection-card-top"><span class="source-number">04</span><span class="pill" data-field="status">Checking</span></div>
+          <h2>TikTok</h2><p class="connection-subtitle">Published video counters</p>
+          <p>Collect permitted video views, likes, comments and shares. Watch time, retention and unique reach are not supplied by the Display API collector.</p>
+          <dl data-field="details"></dl>
+          <p class="connection-help" data-field="help"></p>
+          <div class="connection-actions"><button class="button secondary" data-sync="tiktok" type="button" disabled>Refresh TikTok</button></div>
+        </article>
+      </section>
+      <aside class="reporting-note"><span class="eyebrow">WHAT A REFRESH DOES</span><h3>A new report, with a clear date.</h3><p>Reporting runs on the server and saves successful collections to shared storage. A failed refresh keeps the previous evidence. A connection alone does not mean a fresh report has been collected.</p><p>YouTube consent requests read-only Data and Analytics access for Scran &amp; Pints. Google sign-in and the reporting connection are separate permissions.</p><a href="/workshop.html">Open the workshop ↗</a></aside>
+    </div>
+    <footer><img src="/assets/optimized/3f526c1560f0-480.webp" alt="Scran &amp; Pints"><p>Built for the next matchday.<br>Source dates first. Honest comparisons always.</p><a href="/sponsor.html">YEET partner view ↗</a></footer>
+  </main>
+</body>
+</html>

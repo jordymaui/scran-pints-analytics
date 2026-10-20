@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#db0b19">
+  <title>YouTube Workshop · Scran &amp; Pints</title>
+  <link rel="icon" href="/favicon.png">
+  <link rel="stylesheet" href="/workshop.css">
+  <script type="module" src="/workshop.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to workshop</a>
+  <div class="edition"><span>SCRAN &amp; PINTS / THE WORKSHOP</span><span>TEAM ACCESS · SAVED EVIDENCE</span></div>
+  <header class="site-header">
+    <a href="/" aria-label="Scran and Pints home"><img src="/assets/optimized/3f526c1560f0-480.webp" width="166" height="76" alt="Scran &amp; Pints"></a>
+    <nav aria-label="Main navigation"><a href="/">Public dashboard</a><a href="/sponsor.html">YEET partner view</a><a href="/workshop.html" aria-current="page">Workshop</a><a href="/connections.html">Connections</a><a href="/review-room.html">Review Room ↗</a></nav>
+  </header>
+  <main id="main">
+    <section class="hero">
+      <div><p class="eyebrow">THE NEXT VIDEO STARTS HERE</p><h1>Small details.<br><em>Better videos.</em></h1><p class="hero-copy">Put the episodes side by side. Find the questions worth testing. Build a better title, thumbnail and first thirty seconds.</p><p class="source-stamp" id="source-stamp">Opening the saved YouTube evidence…</p></div>
+      <aside class="workshop-ticket" aria-label="Workshop purpose"><span>THE TEAM PLAYBOOK</span><strong>Watch.<br>Learn.<br>Go again.</strong><div><b>01</b> Compare the same stage<br><b>02</b> Keep the pairs together<br><b>03</b> Write the next experiment</div></aside>
+    </section>
+    <div id="load-state" class="notice" role="status">Loading the workshop…</div>
+    <div id="workshop-content" hidden>
+      <nav class="section-nav" aria-label="Workshop sections"><a href="#compare">01 / Compare</a><a href="#packaging">02 / Packaging</a><a href="#metadata">03 / Metadata</a><a href="#notebook">04 / Notebook</a></nav>
+      <section class="summary-strip" id="summary-strip" aria-label="Evidence coverage"></section>
+      <section id="compare" class="work-section">
+        <div class="section-heading"><div><span class="eyebrow">01 / THE SAME STARTING LINE</span><h2>Compare the episodes.</h2></div><button id="export-comparison" class="button secondary" type="button">Export comparison ↓</button></div>
+        <div class="controls">
+          <fieldset class="segmented"><legend class="sr-only">Comparison window</legend><label><input name="window" type="radio" value="3" checked><span>First 3 dates</span></label><label><input name="window" type="radio" value="7"><span>First 7 dates</span></label></fieldset>
+          <label class="inline-label">Sort by<select id="comparison-sort"><option value="views">Views</option><option value="watchHours">Watch hours</option><option value="subscribersNet">Net subscribers</option><option value="episode">Episode order</option></select></label>
+        </div>
+        <p class="note" id="window-note"></p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Episode comparison table"><table><caption class="sr-only">Same-age episode performance from the saved API export</caption><thead><tr><th scope="col">Episode / saved title</th><th scope="col">Views</th><th scope="col">Watch hours</th><th scope="col">Net subscribers</th><th scope="col">Source dates</th></tr></thead><tbody id="comparison-body"></tbody></table></div>
+        <div class="head-to-head">
+          <div class="section-heading compact"><div><span class="eyebrow">LOOK UNDER THE NUMBERS</span><h3>Two episodes. One closer look.</h3></div><div class="pair-selects"><label>Episode A<select id="video-a"></select></label><label>Episode B<select id="video-b"></select></label></div></div>
+          <div id="video-cards" class="video-cards"></div>
+          <div class="chart-panel"><div class="section-heading compact"><h3>Where people kept watching</h3><span class="pill">API retention · saved snapshot</span></div><p class="note">The horizontal axis is percentage through each video, so different lengths line up. This curve has its own API source window and does not change with the 3/7-date selector.</p><div id="retention-chart"></div></div>
+          <div id="comparison-prompt" class="comparison-prompt"></div>
+        </div>
+      </section>
+      <section id="packaging" class="work-section">
+        <div class="section-heading"><div><span class="eyebrow">02 / THE CLICK &amp; THE PROMISE</span><h2>Keep the pair together.</h2></div><div class="text-links"><a href="/title-table.html">Title Table ↗</a><a href="/thumbnail-lab.html">Thumbnail Lab ↗</a></div></div>
+        <p class="section-intro">See the title and image exactly as they were recovered. Native test watch-time share belongs to the whole pairing. It cannot tell us which title or image caused the difference.</p>
+        <div class="controls packaging-controls"><label>Episode<select id="packaging-video"><option value="all">All episodes</option></select></label><label>Evidence<select id="packaging-scope"><option value="latest">Latest recovered test per episode</option><option value="all">Every saved test round</option><option value="history">Title &amp; thumbnail capture history</option></select></label><label class="search-label">Find a title<input id="packaging-search" type="search" placeholder="Price, club, BEST, WORST…"></label></div>
+        <p id="packaging-count" class="note" aria-live="polite"></p>
+        <div id="packaging-results"></div>
+        <div class="notice quiet">Highest share means the largest number within that test. It does not establish a winner. Old rounds, unfinished tests and later captures stay separate; missing variant CTR, impressions and watch hours remain unavailable.</div>
+      </section>
+      <section id="metadata" class="work-section">
+        <div class="section-heading"><div><span class="eyebrow">03 / CHECK THE FOUNDATIONS</span><h2>What we can actually audit.</h2></div><span class="pill">COLLECTION GAPS VISIBLE</span></div>
+        <p class="section-intro" id="metadata-intro">Title length and recovered packaging are available now. Descriptions and tags have not been collected. Collection dates will appear when a verified YouTube refresh supplies them.</p>
+        <div class="table-scroll" tabindex="0" role="region" aria-label="Metadata coverage table"><table><thead><tr><th scope="col">Episode</th><th scope="col">Title length</th><th scope="col">Recovered titles</th><th scope="col">Image captures</th><th scope="col">Description</th><th scope="col">Tags</th></tr></thead><tbody id="metadata-body"></tbody></table></div>
+        <p class="note">Title counts exclude drafts; repeated captures are retained for provenance. Character count is descriptive, not a quality score. Use Connections to collect current metadata, and retain its source date when comparing changes.</p>
+      </section>
+      <section id="notebook" class="work-section">
+        <div class="section-heading"><div><span class="eyebrow">04 / TURN A QUESTION INTO A TEST</span><h2>The experiment notebook.</h2></div><div class="text-links"><button id="reload-notebook" class="button secondary" type="button">Reload team notes ↻</button><button id="export-notebook" class="button secondary" type="button">Export JSON ↓</button><label class="button secondary import-label">Import JSON<input id="import-notebook" type="file" accept=".json,application/json"></label></div></div>
+        <div class="notice notebook-note"><strong>Shared with the signed-in team.</strong> Save drafts to the cloud notebook. Changes are version checked before saving; conflicting edits are preserved for review. These notes do not change anything on YouTube. <span id="notebook-connection">Opening shared notes…</span><button id="save-notebook" class="text-button" type="button" disabled>Save pending notebook changes</button><button id="import-browser-notebook" class="text-button" type="button" hidden>Import older browser drafts</button></div>
+        <div class="notebook-layout">
+          <form id="experiment-form" class="experiment-form">
+            <div class="form-heading"><h3 id="form-title">Plan the next test</h3><button type="button" id="new-experiment" class="text-button">New draft +</button></div>
+            <input id="experiment-id" type="hidden">
+            <div class="field-pair"><label>Episode<select id="experiment-video" name="videoId"></select></label><label>Status<select id="experiment-status" name="status"><option value="draft">Draft / hypothesis</option><option value="planned">Planned</option><option value="running">Running (manually noted)</option><option value="reviewed">Reviewed</option></select></label></div>
+            <label>The hypothesis<textarea id="experiment-hypothesis" name="hypothesis" required maxlength="2000" rows="2" placeholder="We think a specific price will make the promise clearer because…"></textarea></label>
+            <label>What changes?<select id="experiment-change" name="change"><option value="Title only">Title only · keep the image fixed</option><option value="Thumbnail only">Thumbnail only · keep the title fixed</option><option value="Title + thumbnail pairing">Title + thumbnail pairing</option><option value="Opening / retention">Opening / retention</option><option value="Metadata">Metadata · collect the missing source first</option></select></label>
+            <label>Control / baseline<textarea id="experiment-control" name="control" maxlength="2000" rows="2" placeholder="Record the original title, image and source date."></textarea></label>
+            <label>Candidate title or opening<textarea id="experiment-candidate" name="candidate" maxlength="2000" rows="2" placeholder="Write the exact candidate."></textarea></label>
+            <label>Thumbnail idea / reference<textarea id="experiment-thumbnail" name="thumbnail" maxlength="2000" rows="2" placeholder="Describe the image and how it delivers the promise."></textarea></label>
+            <label>Measurement &amp; window<textarea id="experiment-metric" name="metric" required maxlength="2000" rows="2" placeholder="E.g. native test watch-time share; retain full test dates and result."></textarea></label>
+            <label>Decision rule, before starting<textarea id="experiment-decision" name="decision" required maxlength="2000" rows="2" placeholder="What evidence would support the change? What stays inconclusive?"></textarea></label>
+            <label>Observed result &amp; evidence<textarea id="experiment-result" name="result" maxlength="4000" rows="3" placeholder="Leave blank until measured. Include dates, source and limitations."></textarea></label>
+            <button class="button" type="submit">Save team draft</button><p class="note" id="notebook-status" role="status"></p>
+          </form>
+          <aside><div class="notebook-guide"><span class="eyebrow">MAKE THE LESSON REUSABLE</span><h3>A hypothesis is a starting point.</h3><ol><li>Record the exact pairing and source dates.</li><li>Choose the outcome before looking at results.</li><li>Keep a comparable baseline; note audience and timing differences.</li><li>Keep “inconclusive” as a valid result.</li></ol></div><div class="saved-heading"><h3>Saved experiments</h3><span id="draft-count" class="pill">0</span></div><div id="saved-experiments"></div></aside>
+        </div>
+      </section>
+      <details class="method"><summary>Sources, definitions &amp; comparison limits</summary><p id="method-dates"></p><p>First 3/7 dates means the publication calendar date plus the following 2/6 dates in the saved API export. The first date can be partial; this is not an exact 72/168-hour comparison. Every date must be present exactly once. Missing windows are excluded, never treated as zero.</p><p>Watch hours sum estimated minutes watched divided by 60. Net subscribers sum gains minus losses. Studio cards are rounded since-published observations at different video ages. They stay separate from equal-age comparisons and native test watch-time shares.</p><p>Saved history is recovered evidence, not a complete switch log. Combined title and thumbnail tests support conclusions about that pairing only. Uncontrolled comparisons between videos suggest questions; they do not establish causality.</p></details>
+    </div>
+    <footer><img src="/assets/optimized/3f526c1560f0-480.webp" width="140" height="64" alt="Scran &amp; Pints"><p>Every number has a source.<br>Every new idea starts as a question.</p><a href="#main">Back to top ↑</a></footer>
+  </main>
+  <dialog id="image-dialog"><button id="close-image" class="button" type="button">Close ×</button><img id="preview-image" alt=""><p id="preview-caption"></p></dialog>
+</body>
+</html>
