@@ -15,7 +15,7 @@ const report = { schemaVersion: 1, sources: [{ id: 'instagram', label: 'Instagra
   provenance: { kind: 'manual-browser', label: 'Captured Instagram Insights' },
   dateRange: { start: null, end: null, timezone: null } }] };
 
-function ui() {
+function ui(fixture = report) {
   const workspace = { innerHTML: '' }, select = { addEventListener() {} };
   const context = vm.createContext({ Intl, Date, buildAllSocialAnalytics,
     document: { documentElement: {}, querySelector: selector => selector === '#workspace' ? workspace
@@ -23,7 +23,7 @@ function ui() {
     window: { innerWidth: 1280, SPSelect: { refresh() {} } },
     getComputedStyle: () => ({ getPropertyValue: () => '200' }),
   });
-  vm.runInContext(code, context); context.fixture = report;
+  vm.runInContext(code, context); context.fixture = fixture;
   vm.runInContext("report = fixture; selectedSource = 'instagram';", context);
   return { context, workspace };
 }
@@ -73,4 +73,54 @@ test('ALL includes Instagram captured history prominently without inventing a da
   assert.equal(model.reportedHistory.views, widest.instagramViews);
   assert.deepEqual(model.performance.daily, []);
   assert.equal(model.headlines.followers, capture.followers);
+});
+
+test('selected ALL-social reports include Instagram once while daily activity remains separately scoped', () => {
+  const range = { start: '2026-01-01', end: '2026-01-14', timezone: null };
+  const sequence = views => Array.from({ length: 14 }, (_, index) => ({
+    date: `2026-01-${String(index + 1).padStart(2, '0')}`,
+    views, likes: 1, comments: 1, shares: 0,
+  }));
+  const mixed = structuredClone(report);
+  mixed.sources.push({ id: 'youtube-longform', label: 'YouTube', status: 'snapshot',
+    capturedAt: capture.capturedAt, metrics: { views: 300, followers: 10, videoCount: 2 }, content: [],
+    performance: { dateRange: range, daily: sequence(10) } },
+  { id: 'tiktok', label: 'TikTok', status: 'snapshot', capturedAt: capture.capturedAt,
+    metrics: { views: 200, followers: 5, videoCount: 1 }, content: [],
+    studioSupplement: { performance: { dateRange: range, seriesRanges: { overview: range }, daily: sequence(5) } } });
+  const { context, workspace } = ui(mixed);
+  for (const period of ['7d', '30d', 'all']) {
+    context.period = period;
+    vm.runInContext("selectedSource='all';allPeriod=period;render();", context);
+    const model = buildAllSocialAnalytics(mixed, period);
+    const html = workspace.innerHTML;
+    assert.ok(html.includes(`<div data-selected-views><span>Reported views</span><strong title="${displayNumber(model.summary.views)}"`));
+    assert.ok(html.includes(`<div data-selected-actions><span>Recorded actions</span><strong title="${displayNumber(model.summary.engagement)}"`));
+    const selected = html.split('class="yeet-selected-summary"')[1].split('class="yeet-all-daily-report"')[0];
+    assert.match(selected, /YouTube \+ Instagram \+ TikTok/);
+    assert.doesNotMatch(selected, /vs previous period|yeet-change/);
+    assert.match(html, /Instagram interactions/);
+    assert.match(html, /including saves and other actions/);
+    assert.match(html, /Daily activity · YouTube \+ TikTok/);
+    assert.match(html, /daily-report views/);
+    const daily = html.split('class="yeet-all-daily-report"')[1].split('</section>')[0];
+    assert.doesNotMatch(daily, /assets\/platforms\/instagram/);
+    assert.ok(html.includes(`Native Insights captured ${captureDate}`));
+    const instagram = model.summary.platforms.find(platform => platform.id === 'instagram');
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
+    assert.equal(instagram.views, capture.windows.find(window => window.periodDays === days).instagramViews);
+    assert.ok(html.includes(`title="${displayNumber(model.summary.views)}"`));
+  }
+});
+
+test('a retained manual capture is labelled separately when Instagram daily data supplies the summary', () => {
+  const mixed = structuredClone(report);
+  mixed.sources[0].performance = { dateRange: { start: '2026-01-01', end: '2026-01-14', timezone: null },
+    daily: Array.from({ length: 14 }, (_, index) => ({ date: `2026-01-${String(index + 1).padStart(2, '0')}`,
+      views: 10, likes: 1, comments: 0, shares: 0 })) };
+  const { context, workspace } = ui(mixed);
+  vm.runInContext("selectedSource='all';allPeriod='7d';render();", context);
+  assert.match(workspace.innerHTML, /Instagram views · separate capture/);
+  assert.doesNotMatch(workspace.innerHTML, /Instagram views · included above/);
+  assert.equal(buildAllSocialAnalytics(mixed, '7d').summary.views, 70);
 });

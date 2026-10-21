@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildAllSocialAnalytics, combinedAudience } from '../lib/sponsor-aggregate.mjs';
 import { applyInstagramStudioCapture } from '../lib/instagram-studio.mjs';
-import { instagramNativeFixture } from './fixtures/instagram-native.mjs';
+import { instagramNativeFixture, instagramCollaborationFixture } from './fixtures/instagram-native.mjs';
 
 const instagramCapture = instagramNativeFixture();
 
@@ -243,4 +243,86 @@ test('a future native Instagram daily report replaces its period capture in comb
   assert.equal(result.reportedHistory.views, 255 + 28);
   assert.equal(result.reportedHistory.platforms.find(row => row.id === 'instagram').hasDaily, true);
   assert.equal(result.reportedHistory.platforms.filter(row => row.id === 'instagram').length, 1);
+});
+
+test('selected summary includes the matching Instagram native window once while daily chart and growth stay unchanged', () => {
+  const input = applyInstagramStudioCapture(report(), instagramCapture);
+  for (const [period, index, dailyViews, dailyEngagement] of [['7d', 0, 147, 42], ['30d', 1, 245, 84]]) {
+    const result = buildAllSocialAnalytics(input, period);
+    const baseline = buildAllSocialAnalytics(report(), period);
+    assert.equal(result.summary.views, dailyViews + instagramCapture.windows[index].instagramViews);
+    assert.equal(result.summary.engagement, dailyEngagement + instagramCapture.windows[index].interactions);
+    assert.deepEqual(result.performance, baseline.performance);
+    assert.equal(result.summary.platforms.length, 3);
+    const instagram = result.summary.platforms.find(row => row.id === 'instagram');
+    assert.equal(instagram.views, instagramCapture.windows[index].instagramViews);
+    assert.equal(instagram.engagement, instagramCapture.windows[index].interactions);
+    assert.equal(instagram.capturedAt, instagramCapture.capturedAt);
+    assert.deepEqual(instagram.dateRange, { start: null, end: null, timezone: null });
+    assert.equal(instagram.hasDaily, false);
+    assert.equal(result.summary.includesMixedWindows, true);
+    assert.match(result.summary.coverageNote, /nominal .*day selection/);
+    assert.match(result.summary.coverageNote, /Reporting cutoffs and timezones can differ/);
+    assert.equal(result.summary.percent, undefined);
+    for (const source of result.summary.platforms.filter(row => row.hasDaily)) {
+      assert.equal(source.dateRange.start, result.performance.dateRange.start);
+      assert.equal(source.dateRange.end, result.performance.dateRange.end);
+    }
+  }
+});
+
+test('ALL summary uses available history once and never adds FootyScran collaboration or campaign counters', () => {
+  const capture = instagramNativeFixture();
+  capture.collaborations = instagramCollaborationFixture();
+  capture.collaborations.posts[0].views = 999999;
+  const result = buildAllSocialAnalytics(applyInstagramStudioCapture(report(), capture), 'all');
+  assert.deepEqual(result.summary, result.reportedHistory);
+  assert.equal(result.summary.views, 255 + capture.windows[2].instagramViews);
+  assert.equal(result.summary.engagement, 87 + capture.windows[2].interactions);
+  for (const period of ['7d', '30d', 'all']) {
+    const withPosts = buildAllSocialAnalytics(applyInstagramStudioCapture(report(), capture), period);
+    const withoutPosts = buildAllSocialAnalytics(applyInstagramStudioCapture(report(), instagramNativeFixture()), period);
+    assert.deepEqual(withPosts.summary, withoutPosts.summary);
+  }
+});
+
+test('selected summary prefers Instagram API daily reports over a retained manual capture', () => {
+  const input = applyInstagramStudioCapture(report(), instagramCapture);
+  input.sources.find(row => row.id === 'instagram').performance = {
+    capturedAt: '2026-10-15T12:00:00Z', dateRange: range('2026-10-01', '2026-10-14'), daily: rows(14, 2),
+  };
+  const result = buildAllSocialAnalytics(input, '7d');
+  assert.equal(result.summary.views, 161);
+  assert.equal(result.summary.engagement, 63);
+  const instagram = result.summary.platforms.filter(row => row.id === 'instagram');
+  assert.equal(instagram.length, 1);
+  assert.equal(instagram[0].hasDaily, true);
+  assert.equal(instagram[0].views, 14);
+  assert.equal(instagram[0].capturedAt, '2026-10-15T12:00:00Z');
+  assert.equal(result.summary.includesMixedWindows, false);
+});
+
+test('summary keeps unsupported metrics null and never substitutes a different manual window', () => {
+  const capture = instagramNativeFixture();
+  capture.windows[0].instagramViews = null;
+  capture.windows[0].interactions = null;
+  let input = applyInstagramStudioCapture(report(), capture);
+  let result = buildAllSocialAnalytics(input, '7d');
+  const instagram = result.summary.platforms.find(row => row.id === 'instagram');
+  assert.equal(instagram.views, null);
+  assert.equal(instagram.engagement, null);
+  assert.equal(result.summary.views, 147);
+  assert.equal(result.summary.engagement, 42);
+  assert.match(result.summary.coverageNote, /reported contributions only/);
+  capture.windows = capture.windows.filter(row => row.periodDays !== 7);
+  result = buildAllSocialAnalytics(applyInstagramStudioCapture(report(), capture), '7d');
+  assert.equal(result.summary.platforms.some(row => row.id === 'instagram'), false);
+  input = applyInstagramStudioCapture({ sources: [{ id: 'instagram', status: 'not-connected' }] }, instagramNativeFixture());
+  result = buildAllSocialAnalytics(input, '7d');
+  assert.equal(result.summary.views, instagramNativeFixture().windows[0].instagramViews);
+  assert.deepEqual(result.performance.daily, []);
+  assert.equal(result.performance.comparison.views, null);
+  const empty = buildAllSocialAnalytics({ sources: [] }, '7d');
+  assert.equal(empty.summary.views, null);
+  assert.equal(empty.summary.engagement, null);
 });
