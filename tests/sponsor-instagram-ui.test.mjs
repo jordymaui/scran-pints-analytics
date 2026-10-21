@@ -65,8 +65,8 @@ test('ALL includes Instagram captured history prominently without inventing a da
   assert.match(workspace.innerHTML, /Reported history/);
   const widest = [...capture.windows].sort((a, b) => b.periodDays - a.periodDays)[0];
   assert.ok(workspace.innerHTML.includes(`title="${displayNumber(widest.instagramViews)}"`));
-  assert.match(workspace.innerHTML, /Instagram · Last 7 days/);
-  assert.ok(workspace.innerHTML.includes(`Native Insights captured ${captureDate}`));
+  assert.match(workspace.innerHTML, /data-primary-platform="instagram"/);
+  assert.doesNotMatch(workspace.innerHTML, /yeet-instagram-compact|View all Instagram Insights →/);
   const model = buildAllSocialAnalytics(report, '7d');
   assert.equal(model.headlines.views, null);
   assert.equal(model.headlines.uploads, null);
@@ -114,7 +114,7 @@ test('selected ALL-social reports include Instagram once while daily activity re
     assert.match(html, /daily-report views/);
     const daily = html.split('class="yeet-all-daily-report"')[1].split('</section>')[0];
     assert.doesNotMatch(daily, /assets\/platforms\/instagram/);
-    assert.ok(html.includes(`Native Insights captured ${captureDate}`));
+    assert.doesNotMatch(html, /yeet-instagram-compact|View all Instagram Insights →/);
     const instagram = model.summary.platforms.find(platform => platform.id === 'instagram');
     const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
     assert.equal(instagram.views, capture.windows.find(window => window.periodDays === days).instagramViews);
@@ -129,14 +129,13 @@ test('selected ALL-social reports include Instagram once while daily activity re
   assert.match(actions, /Recorded actions by platform/);
 });
 
-test('a retained manual capture is labelled separately when Instagram daily data supplies the summary', () => {
+test('a retained manual capture does not add a duplicate Instagram card to the combined view', () => {
   const mixed = structuredClone(report);
   mixed.sources[0].performance = { dateRange: { start: '2026-01-01', end: '2026-01-14', timezone: null },
     daily: Array.from({ length: 14 }, (_, index) => ({ date: `2026-01-${String(index + 1).padStart(2, '0')}`,
       views: 10, likes: 1, comments: 0, shares: 0 })) };
   const { context, workspace } = ui(mixed);
   vm.runInContext("selectedSource='all';allPeriod='7d';render();", context);
-  assert.match(workspace.innerHTML, /Instagram views · separate capture/);
-  assert.doesNotMatch(workspace.innerHTML, /Instagram views · included above/);
+  assert.doesNotMatch(workspace.innerHTML, /yeet-instagram-compact|Instagram views · separate capture|Instagram views · included above/);
   assert.equal(buildAllSocialAnalytics(mixed, '7d').summary.views, 70);
 });

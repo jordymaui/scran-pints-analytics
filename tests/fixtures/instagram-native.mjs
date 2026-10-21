@@ -43,3 +43,12 @@ export function instagramCollaborationFixture() {
         metricScope: 'post-lifetime', viewsPrecision: 'unavailable', relationship: 'campaign-post' },
     ] };
 }
+
+export function instagramPostInsightsFixture() {
+  return { capturedAt: '2026-01-16T09:45:00Z', reportingWindow: 'not-shown',
+    platformScope: 'unspecified', method: 'native-insights',
+    views: 1250, viewers: 900, interactions: 40, likes: 20, comments: 3, saves: 4,
+    shares: 0, accountsEngaged: 30,
+    viewAudience: [{ label: 'Followers', percentage: 10 }, { label: 'Non-followers', percentage: 90 }],
+    interactionAudience: [{ label: 'Followers', percentage: 25 }, { label: 'Non-followers', percentage: 75 }] };
+}
