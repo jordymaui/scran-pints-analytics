@@ -99,6 +99,15 @@ test('selected ALL-social reports include Instagram once while daily activity re
     const selected = html.split('class="yeet-selected-summary"')[1].split('class="yeet-all-daily-report"')[0];
     assert.match(selected, /YouTube \+ Instagram \+ TikTok/);
     assert.doesNotMatch(selected, /vs previous period|yeet-change/);
+    assert.match(selected, /class="yeet-primary-platform-chart"/);
+    assert.match(html, /<details class="yeet-all-daily-details"><summary>/);
+    assert.match(html, /Daily trend · YouTube \+ TikTok/);
+    for (const platform of model.summary.platforms) {
+      const row = selected.split(`data-primary-platform="${platform.id}"`)[1];
+      assert.ok(row, `${platform.label} appears in the primary chart for ${period}`);
+      assert.ok(row.split('class="yeet-primary-platform-row"')[0].includes(`title="${displayNumber(platform.views)}"`));
+    }
+    assert.ok(html.indexOf('data-primary-platform="instagram"') < html.indexOf('<details class="yeet-all-daily-details"'));
     assert.match(html, /Instagram interactions/);
     assert.match(html, /including saves and other actions/);
     assert.match(html, /Daily activity · YouTube \+ TikTok/);
@@ -111,6 +120,13 @@ test('selected ALL-social reports include Instagram once while daily activity re
     assert.equal(instagram.views, capture.windows.find(window => window.periodDays === days).instagramViews);
     assert.ok(html.includes(`title="${displayNumber(model.summary.views)}"`));
   }
+  vm.runInContext("allPeriod='7d';allMetric='engagement';render();", context);
+  const actions = workspace.innerHTML.split('class="yeet-primary-platform-chart"')[1].split('<details')[0];
+  const model = buildAllSocialAnalytics(mixed, '7d');
+  for (const platform of model.summary.platforms) {
+    assert.ok(actions.split(`data-primary-platform="${platform.id}"`)[1].includes(`title="${displayNumber(platform.engagement)}"`));
+  }
+  assert.match(actions, /Recorded actions by platform/);
 });
 
 test('a retained manual capture is labelled separately when Instagram daily data supplies the summary', () => {
