@@ -41,6 +41,7 @@ let busySource = null;
 let statusPending = false;
 let teamAccess = false;
 let reviewedStudioReport = null;
+let instagramManualCapture = null;
 
 function setTeamAccess(allowed) {
   teamAccess = allowed === true;
@@ -65,6 +66,7 @@ function message(text, success = false) {
   $('#connection-message').textContent = text;
   $('#connection-message').classList.toggle('success', success);
 }
+function instagramCapturedReport(source){const capture=source?.id==='instagram'?source.manualCapture:null;if(capture?.method!=='manual-browser-inspection'||!Array.isArray(capture.windows))return null;const window=capture.windows.find(row=>row.periodDays===90);return window?{capture,window,manualOnly:source.provenance?.kind==='manual-browser'}:null;}
 function renderStatus() {
   const platforms = new Map(current.platforms.map(platform => [platform.id, platform]));
   for (const source of sourceIds) {
@@ -72,25 +74,27 @@ function renderStatus() {
     const card = $(`[data-source="${source}"]`);
     const status = card.querySelector('[data-field="status"]');
     const connected = platform.connected === true;
+    const manual = source === 'instagram' ? instagramManualCapture : null;
     const publicReady = source === 'youtube' && current.setup?.youtubePublic === true;
     const verified = current.configured === true;
-    status.textContent = !verified ? 'Status unavailable' : connected ? 'Connected' : publicReady ? 'Public counters ready' : 'Setup needed';
-    status.className = `pill ${verified && (connected || publicReady) ? 'connected' : 'pending'}`;
+    status.textContent = manual ? connected ? 'API connected · native capture saved' : 'Native capture available' : !verified ? 'Status unavailable' : connected ? 'Connected' : publicReady ? 'Public counters ready' : 'Setup needed';
+    status.className = `pill ${manual || verified && (connected || publicReady) ? 'connected' : 'pending'}`;
     const lastSync = platform.lastSync;
     const syncLabel = !lastSync ? 'No run recorded' : lastSync.status === 'ready' ? lastSync.errorCode === 'partial_refresh' ? 'Saved with gaps' : 'Completed' :
       { failed: 'Failed · previous data kept', blocked: 'Setup blocked', busy: 'Already running', 'not-connected': 'Not connected' }[lastSync.status] || 'Needs attention';
     card.querySelector('[data-field="details"]').innerHTML = [
-      ['Reporting connection', !verified ? 'Could not be checked' : connected ? `Saved ${formatDate(platform.connectedAt)}` : 'Not connected'],
+      [manual ? 'API connection' : 'Reporting connection', !verified ? 'Could not be checked' : connected ? `Saved ${formatDate(platform.connectedAt)}` : 'Not connected'],
+      ...(manual ? [['Native report captured', formatDate(manual.capture.capturedAt)], ['Instagram views · Last 90 days', new Intl.NumberFormat('en-GB').format(manual.window.instagramViews)], ['Followers at capture', new Intl.NumberFormat('en-GB').format(manual.capture.followers)]] : []),
       ...(source === 'youtube' ? [['Public counters', publicReady ? 'Public API configured' : 'Public API key needed']] : []),
-      ['Latest saved collection', !verified ? 'Could not be checked' : platform.hasSnapshot ? formatDate(platform.capturedAt) : 'No cloud collection yet'],
+      [manual ? 'Latest saved API collection' : 'Latest saved collection', manual?.manualOnly ? 'Not collected through API' : !verified ? 'Could not be checked' : platform.hasSnapshot ? formatDate(platform.capturedAt) : 'No cloud collection yet'],
       ['Last refresh', !verified ? 'Could not be checked' : `${syncLabel}${lastSync?.completedAt ? ` · ${formatDate(lastSync.completedAt)}` : ''}`],
     ].map(([label, value]) => `<div><dt>${escapeHTML(label)}</dt><dd>${escapeHTML(value)}</dd></div>`).join('');
     let help;
     if (source === 'youtube') help = connected ? 'The channel owner has connected YouTube Analytics. Channel, episode and packaging reports keep their own source dates.' : publicReady ? 'Public channel counters are available. An owner connection is needed for watch time, retention and other YouTube Analytics reports.' : 'YouTube reporting has not been configured yet.';
     if (source === 'youtube-shorts') help = connected ? 'Shorts reporting uses the channel’s YouTube connection. Views and engaged views are reported separately.' : 'A YouTube owner connection is needed to collect a separate Shorts Analytics report.';
-    if (source === 'instagram') help = connected ? 'The account is connected. A refresh collects available media counters, daily views and follower demographics.' : 'A Creator account works too. The Meta app must be configured before the owner can approve read-only reporting.';
+    if (source === 'instagram') help = manual ? `Native Insights captured ${formatDate(manual.capture.capturedAt)} are available on the dashboard and YEET. ${!verified ? 'The API connection status could not be verified.' : connected ? 'The separate API connection can collect its available reports.' : 'The API is not connected.'} Refresh does not update this manual capture; the team records a new capture to advance it.` : connected ? 'The account is connected. A refresh collects available media counters, daily views and follower demographics.' : 'A Creator account works too. The Meta app must be configured before the owner can approve read-only reporting.';
     if (source === 'tiktok') help = connected ? 'A reporting grant is stored. A refresh collects the counters the connected app is allowed to read.' : 'A TikTok developer app, approved scopes and account authorisation still need setup. No TikTok connection has been recorded.';
-    card.querySelector('[data-field="help"]').textContent = verified ? help : 'Connection status could not be verified. Previously collected reports remain available.';
+    card.querySelector('[data-field="help"]').textContent = verified || manual ? help : 'Connection status could not be verified. Previously collected reports remain available.';
     const button = card.querySelector('[data-sync]');
     button.disabled = !teamAccess || !verified || (!connected && !publicReady) || !!busySource || statusPending;
     button.textContent = busySource === source ? 'Collecting report…' : {
@@ -202,7 +206,17 @@ async function loadStatus({ showCallback = false } = {}) {
   statusPending = true;
   if (current) renderStatus();
   try {
-    const response = await fetch('/api/connection-status', { credentials: 'same-origin', cache: 'no-store' });
+    const [statusResult, reportResult] = await Promise.allSettled([
+      fetch('/api/connection-status', { credentials: 'same-origin', cache: 'no-store' }),
+      fetch('/api/report', { credentials: 'omit', cache: 'no-store' }),
+    ]);
+    const reportResponse = reportResult.status === 'fulfilled' ? reportResult.value : null;
+    if (reportResponse?.ok) {
+      try { const report = await reportResponse.json(); instagramManualCapture = report.schemaVersion === 1 && Array.isArray(report.sources) ? instagramCapturedReport(report.sources.find(source => source.id === 'instagram')) : null; }
+      catch { /* A failed public report read never changes API connection state. */ }
+    }
+    if (statusResult.status !== 'fulfilled') throw Error('Connection status unavailable');
+    const response = statusResult.value;
     const result = await response.json();
     if (!response.ok || typeof result.configured !== 'boolean' || !Array.isArray(result.platforms)) throw Error('unavailable');
     current = result;
@@ -221,6 +235,7 @@ async function loadStatus({ showCallback = false } = {}) {
       if (error || params.has('connected')) history.replaceState(null, '', '/connections.html');
     }
   } catch {
+    if (!current && instagramManualCapture) { current = { configured: false, setup: {}, platforms: [] }; $('#connection-state').hidden = true; $('#connection-content').hidden = false; }
     if (current) message('Connection status could not be refreshed. Check again before starting a collection.');
     else {
       $('#connection-state').hidden = false;

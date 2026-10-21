@@ -1,0 +1,76 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import vm from 'node:vm';
+import { buildAllSocialAnalytics } from '../lib/sponsor-aggregate.mjs';
+import { instagramNativeFixture } from './fixtures/instagram-native.mjs';
+
+const capture = instagramNativeFixture();
+const displayNumber = value => new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 }).format(value);
+const captureDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(capture.capturedAt));
+const script = await readFile(new URL('../sponsor.js', import.meta.url), 'utf8');
+const code = script.slice(0, script.indexOf('try { report = await loadReport(); render(); }')).replace(/^import .*\r?\n/gm, '').replace(/^export /gm, '');
+const report = { schemaVersion: 1, sources: [{ id: 'instagram', label: 'Instagram', status: 'snapshot',
+  capturedAt: capture.capturedAt, metrics: { followers: capture.followers, views: null }, daily: [], content: [], manualCapture: capture,
+  provenance: { kind: 'manual-browser', label: 'Captured Instagram Insights' },
+  dateRange: { start: null, end: null, timezone: null } }] };
+
+function ui() {
+  const workspace = { innerHTML: '' }, select = { addEventListener() {} };
+  const context = vm.createContext({ Intl, Date, buildAllSocialAnalytics,
+    document: { documentElement: {}, querySelector: selector => selector === '#workspace' ? workspace
+      : selector === '#yeet-instagram-period' ? select : null, querySelectorAll: () => [] },
+    window: { innerWidth: 1280, SPSelect: { refresh() {} } },
+    getComputedStyle: () => ({ getPropertyValue: () => '200' }),
+  });
+  vm.runInContext(code, context); context.fixture = report;
+  vm.runInContext("report = fixture; selectedSource = 'instagram';", context);
+  return { context, workspace };
+}
+
+test('Instagram 7/30/90 captured Insights retain native totals and unknown reporting boundaries', () => {
+  const { context, workspace } = ui();
+  for (const period of capture.windows) {
+    context.days = period.periodDays; vm.runInContext('instagramDays=days;render();', context);
+    assert.ok(workspace.innerHTML.includes(`title="${displayNumber(period.views)}"`));
+    assert.match(workspace.innerHTML, /exact reporting dates and timezone were not shown/);
+    assert.match(workspace.innerHTML, /No daily values or growth percentages have been inferred/);
+    assert.doesNotMatch(workspace.innerHTML, /All-time performance|Lifetime views|id="yeet-history-chart"/);
+  }
+  vm.runInContext('instagramDays=7;render();', context);
+  const seven = capture.windows.find(period => period.periodDays === 7);
+  assert.ok(workspace.innerHTML.includes(`${displayNumber(seven.instagramViews)} Instagram views`));
+  assert.ok(workspace.innerHTML.includes(`${displayNumber(seven.facebookViews)} Facebook views`));
+});
+
+test('Instagram native distributions, profile activity and sampled Reel counters appear without inferred demographics', () => {
+  const { context, workspace } = ui();
+  vm.runInContext('instagramDays=30;render();', context);
+  const thirty = capture.windows.find(period => period.periodDays === 30);
+  assert.ok(workspace.innerHTML.includes(`${displayNumber(thirty.viewAudience[0].percentage)}%`));
+  assert.ok(workspace.innerHTML.includes(`${displayNumber(thirty.viewContentTypes[0].percentage)}%`));
+  assert.ok(workspace.innerHTML.includes(`title="${displayNumber(thirty.profileVisits)}"`));
+  assert.ok(workspace.innerHTML.includes(`title="${displayNumber(thirty.externalLinkTaps)}"`));
+  assert.match(workspace.innerHTML, /Captured Reel/);
+  assert.ok(workspace.innerHTML.includes(`<span>Saves</span><strong>${displayNumber(capture.content[0].saves)}</strong>`));
+  assert.ok(workspace.innerHTML.includes(`<span>Shares</span><strong>${displayNumber(capture.content[0].shares)}</strong>`));
+  assert.match(workspace.innerHTML, /Age, gender and country were not supplied/);
+  assert.ok(workspace.innerHTML.includes(capture.followerActivity.weekday));
+  assert.match(workspace.innerHTML, /timezone not shown/);
+});
+
+test('ALL includes Instagram captured history prominently without inventing a daily line or lifetime total', () => {
+  const { context, workspace } = ui();
+  vm.runInContext("selectedSource='all';allPeriod='7d';render();", context);
+  assert.match(workspace.innerHTML, /Reported history/);
+  const widest = [...capture.windows].sort((a, b) => b.periodDays - a.periodDays)[0];
+  assert.ok(workspace.innerHTML.includes(`title="${displayNumber(widest.instagramViews)}"`));
+  assert.match(workspace.innerHTML, /Instagram · Last 7 days/);
+  assert.ok(workspace.innerHTML.includes(`Native Insights captured ${captureDate}`));
+  const model = buildAllSocialAnalytics(report, '7d');
+  assert.equal(model.headlines.views, null);
+  assert.equal(model.headlines.uploads, null);
+  assert.equal(model.reportedHistory.views, widest.instagramViews);
+  assert.deepEqual(model.performance.daily, []);
+  assert.equal(model.headlines.followers, capture.followers);
+});

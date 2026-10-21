@@ -13,6 +13,12 @@ Official references: [Meta Instagram Login](https://developers.facebook.com/docs
 
 The owner reports existing YouTube API access and has Viewstats Pro. The inspected main site's Google configuration supports identity sign-in; no YouTube reporting OAuth grant was found there. Reuse an existing Google project if available, then supply or obtain the actual channel authorization. Instagram and TikTok application setup starts from scratch. A signed-in browser or a Pro browser extension is not evidence that a server has API access.
 
+## Instagram native captures
+
+Selected Instagram Insights can be recorded directly from the signed-in account when an API grant is unavailable. The public report labels this as a manual browser capture with its own inspection timestamp. Rolling 7, 30 and 90-day totals retain the labels shown by Instagram; calendar bounds are left unspecified when the platform did not show them. Instagram and Facebook view counts remain separate. These period figures are not all-time counters and are not used as an invented daily history.
+
+A captured Reel is labelled as a sample, with no claim that it is the complete content inventory. Connections shows the available capture separately from the API's authorization state. Public Refresh does not advance a manual capture; the team must inspect and record a newer report. The curated capture is stored in the existing private reporting database. Only selected, validated fields are returned by the public report API at runtime. The capture payload, raw screenshots and account session information are excluded from the public repository and static build.
+
 ## TikTok Studio imports
 
 TikTok Studio supplements the connected Display API with separately dated reports. From Studio's Overview, Followers and Viewers tabs, choose the required period and download CSV. Extract the ZIP files and select `Overview.csv`, `FollowerHistory.csv` and `Viewers.csv` in Connections. `FollowerGender.csv` and `FollowerTopTerritories.csv` add follower demographics. Confirm the exact date windows shown by each report: exported day/month labels omit the year, and Overview/Followers can finish on a different date from Viewers.
