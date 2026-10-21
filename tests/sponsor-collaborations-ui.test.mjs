@@ -116,6 +116,28 @@ test('FootyScran is a separate tab and never contributes to ALL platform reporti
   assert.doesNotMatch(workspace.innerHTML, />IG<|>TK</);
 });
 
+test('reported platform history includes measured-only FootyScran context without inferring a percentage', () => {
+  const capture = instagramCollaborationFixture();
+  capture.posts[1].views = capture.posts[0].views / 2;
+  capture.posts[1].viewsPrecision = 'exact';
+  const { context, workspace, fixture } = ui(capture);
+  const before = buildAllSocialAnalytics(fixture, '7d').summary;
+  vm.runInContext("selectedSource='all';allPeriod='7d';render();", context);
+  const footy = workspace.innerHTML.split('class="yeet-footy-measured"')[1].split('</section>')[0];
+  assert.match(footy, /FootyScran distribution/);
+  assert.match(footy, /assets\/platforms\/footyscran.jpg/);
+  assert.match(footy, /Percentage not yet verified/);
+  assert.match(footy, /Awaiting matching-period data/);
+  assert.match(footy, /no Instagram\/Facebook split/);
+  assert.match(footy, /Collab posts/);
+  assert.match(footy, /FootyScran-only posts/);
+  assert.match(footy, /data-yeet-source="footyscran"/);
+  assert.doesNotMatch(footy, /type="range"|\d+(?:\.\d+)?%|estimated share/i);
+  assert.ok(workspace.innerHTML.indexOf('yeet-footy-measured') > workspace.innerHTML.indexOf('yeet-reported-history-bars'));
+  assert.ok(workspace.innerHTML.indexOf('yeet-footy-measured') < workspace.innerHTML.indexOf('yeet-all-performance'));
+  assert.deepEqual(buildAllSocialAnalytics(fixture, '7d').summary, before);
+});
+
 test('FootyScran gracefully handles an absent capture without reporting fake zero views', () => {
   const { context, workspace } = ui(null);
   assert.equal(context.collaborationSummary(null).totalViews, null);
