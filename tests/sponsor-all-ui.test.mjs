@@ -41,10 +41,10 @@ test('YEET opens with a compiled all-social view and retains individual platform
   assert.match(workspace.innerHTML, /data-yeet-source="all" aria-pressed="true"/);
   assert.match(workspace.innerHTML, /data-yeet-source="youtube-longform"/);
   assert.match(workspace.innerHTML, /data-yeet-source="tiktok"/);
-  assert.match(workspace.innerHTML, /All-time performance/);
-  assert.match(workspace.innerHTML, /title="1,500"/);
+  assert.match(workspace.innerHTML, /Reported history/);
+  assert.match(workspace.innerHTML, /title="210"/);
   assert.match(workspace.innerHTML, /Account followers/);
-  assert.match(workspace.innerHTML, /Instagram not connected/);
+  assert.match(workspace.innerHTML, /Instagram awaiting data/);
   assert.match(workspace.innerHTML, /data-all-period="30d"/);
   assert.match(workspace.innerHTML, /data-all-metric="engagement"/);
   assert.match(workspace.innerHTML, /Views by platform/);
@@ -73,6 +73,6 @@ test('ALL TIME renders cumulative reported lines without changing the lifetime h
   vm.runInContext("allPeriod = 'all'; allMetric = 'engagement'; render();", context);
   assert.match(workspace.innerHTML, /Cumulative reported engagement over available history/);
   assert.match(workspace.innerHTML, /stroke-dasharray="6 4"/);
-  assert.match(workspace.innerHTML, /title="1,500"/);
+  assert.match(workspace.innerHTML, /title="210"/);
   assert.match(workspace.innerHTML, /data-all-period="all" aria-pressed="true"/);
 });

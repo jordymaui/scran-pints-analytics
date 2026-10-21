@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildAllSocialAnalytics, combinedAudience } from '../lib/sponsor-aggregate.mjs';
+import { applyInstagramStudioCapture } from '../lib/instagram-studio.mjs';
+import { instagramNativeFixture } from './fixtures/instagram-native.mjs';
+
+const instagramCapture = instagramNativeFixture();
 
 const range = (start, end) => ({ start, end, timezone: null });
 const rows = (days, views) => Array.from({ length: days }, (_, index) => ({
@@ -194,4 +198,49 @@ test('empty reports preserve missing totals and unsupported periods are rejected
   assert.deepEqual(result.performance.daily, []);
   assert.equal(result.audience.age.rows.every(row => row.percentage === null), true);
   assert.throws(() => buildAllSocialAnalytics(report(), '90d'), /Unsupported/);
+});
+
+test('Instagram joins recorded history once using its widest native window, without changing lifetime counters', () => {
+  const input = applyInstagramStudioCapture(report(), instagramCapture);
+  const result = buildAllSocialAnalytics(input, 'all');
+  assert.equal(result.reportedHistory.views, 255 + instagramCapture.windows[2].instagramViews);
+  assert.equal(result.reportedHistory.engagement, 87 + instagramCapture.windows[2].interactions);
+  assert.equal(result.reportedHistory.platforms.length, 3);
+  assert.equal(result.reportedHistory.platforms.find(row => row.id === 'instagram').hasDaily, false);
+  assert.equal(result.reportedHistory.includesMixedWindows, true);
+  assert.equal(result.headlines.views, 3000);
+  assert.equal(result.headlines.followers, 70 + instagramCapture.followers);
+  assert.equal(result.headlines.uploads, 25, 'An inspected Reel sample does not establish an account upload inventory');
+  assert.equal(result.performance.totals.views, 255, 'Period captures never become fabricated daily activity');
+  assert.deepEqual(result.coverage.missing, []);
+  assert.deepEqual(result.coverage.noDaily, ['Instagram']);
+  assert.deepEqual(result.coverage.counterSources, ['YouTube', 'TikTok']);
+  assert.equal(result.manualPeriods[0].periodDays, 90);
+});
+
+test('Instagram relative windows remain outside aligned 7D/30D graphs and retain differing native totals', () => {
+  const input = applyInstagramStudioCapture(report(), instagramCapture);
+  const seven = buildAllSocialAnalytics(input, '7d');
+  assert.equal(seven.performance.totals.views, 147);
+  assert.equal(seven.performance.comparison.views.percent, 50);
+  assert.equal(seven.performance.daily.some(row => 'instagram' in row.byPlatform), false);
+  assert.equal(seven.manualPeriods[0].views, instagramCapture.windows[0].instagramViews);
+  assert.equal(seven.manualPeriods[0].nativeTotalViews, instagramCapture.windows[0].views);
+  assert.deepEqual(seven.manualPeriods[0].dateRange, { start: null, end: null, timezone: null });
+  assert.equal(seven.reportedHistory.views, 255 + instagramCapture.windows[2].instagramViews);
+  const thirty = buildAllSocialAnalytics(input, '30d');
+  assert.equal(thirty.manualPeriods[0].views, instagramCapture.windows[1].instagramViews);
+  assert.equal(thirty.manualPeriods[0].interactions, instagramCapture.windows[1].interactions);
+  assert.equal(thirty.reportedHistory.views, seven.reportedHistory.views);
+  assert.equal(thirty.audience.contributors.includes('Instagram'), false);
+});
+
+test('a future native Instagram daily report replaces its period capture in combined history instead of double counting', () => {
+  const input = applyInstagramStudioCapture(report(), instagramCapture);
+  const instagram = input.sources.find(row => row.id === 'instagram');
+  instagram.performance = { dateRange: range('2026-10-01', '2026-10-14'), daily: rows(14, 2) };
+  const result = buildAllSocialAnalytics(input, 'all');
+  assert.equal(result.reportedHistory.views, 255 + 28);
+  assert.equal(result.reportedHistory.platforms.find(row => row.id === 'instagram').hasDaily, true);
+  assert.equal(result.reportedHistory.platforms.filter(row => row.id === 'instagram').length, 1);
 });
