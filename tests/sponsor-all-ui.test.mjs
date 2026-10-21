@@ -76,3 +76,22 @@ test('ALL TIME renders cumulative reported lines without changing the lifetime h
   assert.match(workspace.innerHTML, /title="210"/);
   assert.match(workspace.innerHTML, /data-all-period="all" aria-pressed="true"/);
 });
+
+test('daily trend starts closed and retains the user expansion across metric and period renders', () => {
+  const { context, workspace } = ui();
+  const originalSelector = context.document.querySelector;
+  const trend = { open: false, listeners: {}, addEventListener(name, handler) { this.listeners[name] = handler; } };
+  context.document.querySelector = selector => selector === '.yeet-all-daily-details' ? trend : originalSelector(selector);
+  vm.runInContext('render();', context);
+  assert.match(workspace.innerHTML, /<details class="yeet-all-daily-details"><summary>/);
+  trend.open = true;
+  trend.listeners.toggle();
+  vm.runInContext("allMetric='engagement';render();", context);
+  assert.match(workspace.innerHTML, /<details class="yeet-all-daily-details" open><summary>/);
+  vm.runInContext("allPeriod='30d';render();", context);
+  assert.match(workspace.innerHTML, /<details class="yeet-all-daily-details" open><summary>/);
+  trend.open = false;
+  trend.listeners.toggle();
+  vm.runInContext("allMetric='views';render();", context);
+  assert.match(workspace.innerHTML, /<details class="yeet-all-daily-details"><summary>/);
+});
