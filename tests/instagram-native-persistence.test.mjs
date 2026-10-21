@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { syncCloudSource } from '../lib/cloud-sync.mjs';
 import { validateSocialImport } from '../lib/social-schema.mjs';
-import { instagramNativeFixture } from './fixtures/instagram-native.mjs';
+import { instagramNativeFixture, instagramCollaborationFixture } from './fixtures/instagram-native.mjs';
 import { CollectionError } from '../lib/collectors.mjs';
 
 const NOW = '2026-01-16T12:00:00Z';
@@ -76,4 +76,17 @@ test('manual capture uses the strict Instagram-only schema without weakening API
   }
   source.manualCapture.accessToken = 'PRIVATE_SYNTHETIC_TOKEN';
   assert.throws(() => validateSocialImport({ schemaVersion: 1, sources: [source] }));
+});
+
+test('collaboration observations survive API refresh without changing account window dates or adding post totals', async () => {
+  const initial = wrapper();
+  initial.manualCapture.collaborations = instagramCollaborationFixture();
+  const store = storeFor(initial);
+  const result = await syncCloudSource({ source: 'instagram', store, now: () => NOW, env: {},
+    collectors: { instagram: async () => apiSource() } });
+  assert.equal(result.status, 'ready');
+  assert.deepEqual(store.row.payload.manualCapture.collaborations, instagramCollaborationFixture());
+  assert.equal(store.row.payload.manualCapture.capturedAt, initial.manualCapture.capturedAt);
+  assert.equal(store.row.payload.metrics.views, apiSource().metrics.views);
+  assert.deepEqual(store.row.payload.content, []);
 });
