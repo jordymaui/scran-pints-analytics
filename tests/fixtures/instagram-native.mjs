@@ -28,3 +28,18 @@ export function instagramNativeFixture() {
       viewAudience: audience(10, 90), interactionAudience: audience(40, 60) }],
   };
 }
+
+export function instagramCollaborationFixture() {
+  return { accountUsername: 'footyscran', capturedAt: '2026-01-16T10:00:00Z',
+    coverage: 'observed-profile-collabs', posts: [
+      { shortcode: 'Synthetic_A', url: 'https://www.instagram.com/reel/Synthetic_A/',
+        mediaId: '1000000000000000101', title: 'Synthetic collaboration example',
+        publishedAt: '2026-01-10', capturedAt: '2026-01-16T09:00:00Z',
+        views: 1200, likes: 15, comments: 2, shares: null, saves: null,
+        metricScope: 'post-lifetime', viewsPrecision: 'rounded', relationship: 'collaboration' },
+      { shortcode: 'Synthetic_B', url: 'https://www.instagram.com/p/Synthetic_B/',
+        mediaId: null, title: null, publishedAt: null, capturedAt: '2026-01-16T09:30:00Z',
+        views: null, likes: null, comments: null, shares: null, saves: null,
+        metricScope: 'post-lifetime', viewsPrecision: 'unavailable', relationship: 'campaign-post' },
+    ] };
+}
