@@ -12,6 +12,7 @@ import connectionStatus from '../api/connection-status.mjs';
 import workshopNotebook from '../api/workshop-notebook.mjs';
 import youtubeConnection from '../api/connections/youtube.mjs';
 import instagramConnection from '../api/connections/instagram.mjs';
+import instagramBrowserConnection from '../lib/instagram-browser-route.mjs';
 import tiktokConnection from '../api/connections/tiktok.mjs';
 import publicSocialRefresh from '../api/public-social-refresh.mjs';
 import sync from '../api/sync.mjs';
@@ -28,6 +29,7 @@ const apiRoutes = new Map([
   ['/api/public-refresh', publicRefresh],
   ['/api/public-social-refresh', publicSocialRefresh],
   ['/api/connections/instagram', instagramConnection], ['/api/connections/tiktok', tiktokConnection],
+  ['/api/connections/instagram-browser', instagramBrowserConnection],
 ]);
 export const PRIVATE_ROOT_FILES = new Set([
   ...PRIVATE_PAGES, 'data.json', 'image-index.json', 'image-assets.js',

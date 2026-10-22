@@ -32,12 +32,18 @@ test('social state returns independent leases, dated capture and status without 
   ] });
   const result = await store.getPublicSocialRefreshState({ now: () => Date.parse(NOW) });
   assert.deepEqual(result, [
-    { id: 'instagram', connected: true, running: true, capturedAt: '2026-10-20T15:30:00.000Z', lastSyncStatus: 'failed' },
-    { id: 'tiktok', connected: true, running: false, capturedAt: '2026-10-20T15:40:00.000Z', lastSyncStatus: 'ready' },
+    { id: 'instagram', connected: true, mode: 'official-api', browserState: null, running: true,
+      capturedAt: '2026-10-20T15:30:00.000Z', lastSyncStatus: 'failed', lastSyncAt: NOW, lastSyncErrorCode: null, warningCount: null },
+    { id: 'tiktok', connected: true, mode: 'official-api', browserState: null, running: false,
+      capturedAt: '2026-10-20T15:40:00.000Z', lastSyncStatus: 'ready', lastSyncAt: NOW, lastSyncErrorCode: null, warningCount: null },
   ]);
   assert.doesNotMatch(JSON.stringify(result), /PRIVATE_|account|credentials|payload|owner|metadata/);
   for (const url of calls) {
-    assert.doesNotMatch(url.searchParams.get('select'), /\*|credentials|account_id|payload|owner|metadata|message/);
+    for (const column of url.searchParams.get('select').split(',')) {
+      if (['reportingMode:credentials->>reportingMode', 'browserState:credentials->browser->>state',
+        'warningCount:metadata->warningCount'].includes(column)) continue;
+      assert.doesNotMatch(column, /\*|credentials|account_id|payload|owner|metadata|message/);
+    }
   }
   const query = calls.find(url => url.pathname.endsWith('analytics_sync_locks'));
   assert.equal(query.searchParams.get('source'), 'in.(instagram,tiktok)');

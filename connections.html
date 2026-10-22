@@ -55,7 +55,7 @@
         <article class="connection-card" data-source="instagram">
           <div class="connection-card-top"><span class="source-number">03</span><span class="pill" data-field="status">Checking</span></div>
           <h2>Instagram</h2><p class="connection-subtitle">Account &amp; content insights</p>
-          <p>Captured native Insights remain available with their inspection date. A separate @scranpints Creator or Business connection can collect available API reports.</p>
+          <p>Native account and collab Insights keep their capture dates. Hosted browser scans or permitted API reports can add newer data.</p>
           <dl data-field="details"></dl>
           <p class="connection-help" data-field="help"></p>
           <div class="connection-actions" data-team-control hidden><form action="/api/connections/instagram" method="post"><button class="button" id="connect-instagram" type="submit" disabled>Connect Instagram ↗</button></form><button class="button secondary" data-sync="instagram" type="button" disabled>Refresh Instagram</button></div>
@@ -68,6 +68,20 @@
           <p class="connection-help" data-field="help"></p>
           <div class="connection-actions" data-team-control hidden><form action="/api/connections/tiktok" method="post"><button class="button" id="connect-tiktok" type="submit" disabled>Connect TikTok ↗</button></form><button class="button secondary" data-sync="tiktok" type="button" disabled>Refresh TikTok</button></div>
         </article>
+      </section>
+      <section class="instagram-browser" data-team-control hidden aria-labelledby="instagram-browser-heading">
+        <div class="instagram-browser-heading"><div><span class="eyebrow">HOSTED REPORTING</span><h2 id="instagram-browser-heading">Instagram browser scans</h2></div><span id="instagram-browser-state" class="pill pending">Checking</span></div>
+        <p>Connect a hosted browser, then sign into @scranpints in its private login tab. No Meta developer app is needed for this connection.</p>
+        <dl id="instagram-browser-details" class="instagram-browser-details"></dl>
+        <form id="instagram-browser-configure" class="instagram-browser-form">
+          <label>Browserbase API key<input id="instagram-browser-key" type="password" autocomplete="off" spellcheck="false" required placeholder="Enter a Browserbase API key"></label>
+          <label>Project ID <span>(optional)</span><input id="instagram-browser-project" type="text" autocomplete="off" spellcheck="false" placeholder="Browserbase project ID"></label>
+          <p>The key is saved privately on the server and cleared from this form after submitting.</p>
+          <button class="button secondary" id="instagram-browser-save" type="submit">Save browser configuration</button>
+        </form>
+        <div class="instagram-browser-actions"><button class="button" id="instagram-browser-start" type="button" disabled>Open cloud Instagram login ↗</button><button class="button secondary" id="instagram-browser-check" type="button">Check browser status ↻</button><a class="button secondary" id="instagram-browser-live" target="_blank" rel="noopener noreferrer" hidden>Open private login tab ↗</a></div>
+        <p id="instagram-browser-message" class="notice" role="status" hidden></p>
+        <p class="instagram-browser-help">Once the login is verified, use Refresh Instagram above to collect a dated scan. Browserbase’s free plan includes one browser hour for a pilot; ongoing use depends on the plan’s allowance.</p>
       </section>
       <section class="studio-import" data-team-control hidden aria-labelledby="studio-import-heading">
         <div class="studio-import-heading"><span class="eyebrow">TIKTOK STUDIO</span><h2 id="studio-import-heading">Import Studio exports</h2><p>Add daily performance and follower breakdowns from TikTok Studio. Public video counters continue to refresh through the connected API.</p></div>

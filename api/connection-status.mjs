@@ -1,13 +1,11 @@
 import { json } from '../lib/auth.mjs';
-import { createCloudStore, CLOUD_SOURCES } from '../lib/cloud-store.mjs';
+import { createCloudStore, CLOUD_SOURCES, publicSyncErrorCode } from '../lib/cloud-store.mjs';
 import { youtubeOAuthConfig } from '../lib/youtube-oauth.mjs';
 import { instagramOAuthConfig } from '../lib/instagram-oauth.mjs';
 import { tiktokOAuthConfig } from '../lib/tiktok-oauth.mjs';
 
 const STATUSES = new Set(['ready', 'not-connected', 'blocked', 'failed', 'busy']);
-const ERRORS = new Set(['authorization', 'not-connected', 'not-configured', 'blocked', 'configuration',
-  'no-data', 'rate-limit', 'network', 'api-error', 'invalid-response', 'pagination', 'stale-data',
-  'coverage-loss', 'content-type', 'privacy', 'sync_in_progress', 'newer_snapshot_exists', 'partial_refresh']);
+const BROWSER_STATES = new Set(['configured', 'connecting', 'ready', 'login-required', 'failed']);
 const timestamp = value => typeof value === 'string' &&
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
   Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value.slice(0, 10) ? value : null;
@@ -15,12 +13,16 @@ const timestamp = value => typeof value === 'string' &&
 export function publicConnectionStatuses(values) {
   return CLOUD_SOURCES.map(id => {
     const row = Array.isArray(values) ? values.find(value => value?.id === id) : null;
+    const mode = id === 'instagram' && row?.mode === 'browser-sweep' ? 'browser-sweep' : 'official-api';
+    const browserState = mode === 'browser-sweep' && BROWSER_STATES.has(row?.browserState) ? row.browserState : null;
+    const connected = row?.connected === true && (mode !== 'browser-sweep' || browserState === 'ready');
     return {
-      id, connected: row?.connected === true, connectedAt: timestamp(row?.connectedAt),
+      id, mode, browserState, connected, connectedAt: connected ? timestamp(row?.connectedAt) : null,
       hasSnapshot: row?.hasSnapshot === true, capturedAt: timestamp(row?.capturedAt),
       lastSync: STATUSES.has(row?.lastSync?.status) ? {
         status: row.lastSync.status, completedAt: timestamp(row.lastSync.completedAt),
-        errorCode: ERRORS.has(row.lastSync.errorCode) ? row.lastSync.errorCode : null,
+        errorCode: publicSyncErrorCode(row.lastSync.errorCode),
+        warningCount: Number.isSafeInteger(row.lastSync.warningCount) && row.lastSync.warningCount >= 0 ? row.lastSync.warningCount : null,
       } : null,
     };
   });
@@ -34,7 +36,8 @@ export function createConnectionStatusHandler({
       res.setHeader('Allow', 'GET');
       return json(res, 405, { error: 'method_not_allowed' });
     }
-    const setup = { youtubeOAuth: false, youtubePublic: Boolean(env.YOUTUBE_PUBLIC_API_KEY), tiktokOAuth: false, instagramOAuth: false };
+    const setup = { youtubeOAuth: false, youtubePublic: Boolean(env.YOUTUBE_PUBLIC_API_KEY), tiktokOAuth: false,
+      instagramOAuth: false, instagramBrowser: true };
     try { oauthConfig(env); setup.youtubeOAuth = true; } catch { /* Setup remains unavailable. */ }
     try { instagramOAuthConfig(env); setup.instagramOAuth = true; } catch { /* Setup remains unavailable. */ }
     try { tiktokOAuthConfig(env); setup.tiktokOAuth = true; } catch { /* Setup remains unavailable. */ }

@@ -123,7 +123,7 @@ test('public Connections returns exact sanitized status fields and rejects write
   assert.equal(res.body.platforms[0].connected, true);
   assert.equal(res.body.platforms[0].lastSync.errorCode, 'partial_refresh');
   assert.equal(res.body.platforms[3].lastSync.errorCode, null);
-  assert.deepEqual(res.body.setup, { youtubeOAuth: true, youtubePublic: true, tiktokOAuth: false, instagramOAuth: false });
+  assert.deepEqual(res.body.setup, { youtubeOAuth: true, youtubePublic: true, tiktokOAuth: false, instagramOAuth: false, instagramBrowser: true });
   assert.doesNotMatch(JSON.stringify(res.body), /PRIVATE_|private_token|accountId|email|credentials/);
   assert.match(res.headers['cache-control'], /no-store/);
   const post = response(); await handler({ method: 'POST' }, post);
