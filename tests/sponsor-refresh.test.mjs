@@ -228,3 +228,64 @@ test('recent or failed API outcomes cannot label unchanged Instagram captures up
     assert.match(message, /saved|recent|kept|not refreshed/i);
   }
 });
+
+test('busy browser scans complete on a newer run even when only collab captures changed', async () => {
+  const context = setup(async () => { throw Error('unexpected fetch'); });
+  let clock = Date.parse('2026-10-20T15:20:00Z'), reads = 0;
+  const baseline = '2026-10-20T15:00:00Z', completedAt = '2026-10-20T15:25:00Z';
+  const result = await context.syncPublicSocial({ now: () => clock, wait: async milliseconds => { clock += milliseconds; },
+    request: async (url, options) => {
+      if (options.method === 'POST') return reply({ sources: [{ id: 'instagram', connected: true, running: true,
+        capturedAt: baseline, lastSyncAt: baseline, status: 'busy' }] });
+      return reply({ sources: [{ id: 'instagram', connected: true, running: false, capturedAt: baseline,
+        lastSyncAt: ++reads === 1 ? baseline : completedAt, status: 'partial', lastSyncStatus: 'ready',
+        lastSyncErrorCode: 'partial_refresh', warningCount: 1 }] });
+    } });
+  assert.equal(reads, 2);
+  assert.equal(result[0].status, 'partial');
+  assert.equal(result[0].capturedAt, baseline);
+  assert.equal(result[0].lastSyncAt, completedAt);
+});
+
+test('a changed account capture alone does not finish a busy scan with an unchanged completion', async () => {
+  const context = setup(async () => { throw Error('unexpected fetch'); });
+  let clock = Date.parse('2026-10-20T15:20:00Z');
+  await assert.rejects(() => context.syncPublicSocial({ timeout: 6_000, now: () => clock,
+    wait: async milliseconds => { clock += milliseconds; },
+    request: async (url, options) => reply({ sources: [{ id: 'instagram', connected: true,
+      running: options.method === 'POST', status: options.method === 'POST' ? 'busy' : 'refreshed',
+      capturedAt: options.method === 'POST' ? '2026-10-20T15:00:00Z' : '2026-10-20T15:22:00Z',
+      lastSyncAt: '2026-10-20T15:00:00Z', lastSyncStatus: 'ready' }] }),
+  }), /timed out/);
+});
+
+test('failed browser completion settles without claiming refreshed data', async () => {
+  const context = setup(async () => { throw Error('unexpected fetch'); });
+  let clock = Date.parse('2026-10-20T15:20:00Z');
+  const result = await context.syncPublicSocial({ now: () => clock, wait: async milliseconds => { clock += milliseconds; },
+    request: async (url, options) => reply({ sources: [{ id: 'instagram', connected: true,
+      running: options.method === 'POST', status: options.method === 'POST' ? 'busy' : 'failed',
+      capturedAt: '2026-10-20T15:00:00Z', lastSyncStatus: options.method === 'POST' ? 'ready' : 'failed',
+      lastSyncAt: options.method === 'POST' ? '2026-10-20T15:00:00Z' : '2026-10-20T15:23:00Z' }] }),
+  });
+  assert.equal(result[0].status, 'failed');
+});
+
+test('partial browser outcomes retain account dates and distinguish fresh or failed native sweeps', () => {
+  const context = setup(async () => { throw Error('unexpected fetch'); });
+  const before = manualReport(), after = structuredClone(before);
+  after.sources[0].provenance.kind = 'browser-sweep';
+  after.sources[0].manualCapture.method = 'browser-sweep';
+  after.sources[0].manualCapture.collaborations.posts[0].insights.capturedAt = '2026-10-21T14:00:00Z';
+  const partial = instagramResult('partial', { mode: 'browser-sweep', lastSyncStatus: 'ready', lastSyncErrorCode: 'partial_refresh' });
+  let message = context.socialRefreshMessages(partial, before, after).join(' ');
+  assert.match(message, /with gaps/);
+  assert.match(message, /1\/2 newer captures/);
+  assert.doesNotMatch(message, /Instagram Insights refreshed/);
+  after.sources[0].manualCapture.capturedAt = '2026-10-21T14:00:00Z';
+  message = context.socialRefreshMessages(instagramResult('refreshed', { mode: 'browser-sweep', lastSyncStatus: 'ready' }), before, after).join(' ');
+  assert.match(message, /Instagram Insights refreshed 21 Oct/);
+  message = context.socialRefreshMessages(instagramResult('failed', { mode: 'browser-sweep', lastSyncStatus: 'failed' }), before, before).join(' ');
+  assert.match(message, /Instagram refresh failed/);
+  assert.doesNotMatch(message, /Insights refreshed|reports updated|newer saved captures loaded/);
+});

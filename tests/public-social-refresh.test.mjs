@@ -114,3 +114,48 @@ test('unconnected social accounts are skipped and storage errors have only stati
   assert.equal(unavailable.body.error, 'refresh_unavailable');
   assert.doesNotMatch(JSON.stringify(unavailable.body), /PRIVATE_|database details/);
 });
+
+test('public status exposes only safe completion metadata and partial browser outcomes', async () => {
+  const rows = states();
+  Object.assign(rows[0], { lastSyncAt: NOW, lastSyncErrorCode: 'partial_refresh', warningCount: 2,
+    mode: 'browser-sweep', browserState: 'ready' });
+  Object.assign(rows[1], { lastSyncAt: 'PRIVATE_TIMESTAMP', lastSyncErrorCode: 'PRIVATE_TOKEN', warningCount: -1,
+    mode: 'PRIVATE_MODE', browserState: { sessionUrl: 'PRIVATE_URL' } });
+  const { handler } = setup({ rows }), res = response();
+  await handler(request({ method: 'GET', headers: {} }), res);
+  assert.equal(res.body.sources[0].status, 'partial');
+  assert.equal(res.body.sources[0].lastSyncAt, NOW);
+  assert.equal(res.body.sources[0].lastSyncErrorCode, 'partial_refresh');
+  assert.equal(res.body.sources[0].warningCount, 2);
+  assert.equal(res.body.sources[0].mode, 'browser-sweep');
+  assert.equal(res.body.sources[0].browserState, 'ready');
+  for (const key of ['lastSyncAt', 'lastSyncErrorCode', 'warningCount', 'mode', 'browserState']) assert.equal(res.body.sources[1][key], null);
+  assert.doesNotMatch(JSON.stringify(res.body), /PRIVATE_|sessionUrl|credentials/);
+});
+
+test('ready collections with retained reports return partial and preserve safe run completion time', async () => {
+  const completedAt = '2026-10-20T16:03:00.000Z';
+  const { handler } = setup({ results: { instagram: { status: 'ready', errorCode: 'partial_refresh',
+    warningCount: 1, completedAt, rawError: 'PRIVATE_ERROR' } } }), res = response();
+  await handler(request(), res);
+  assert.equal(res.body.sources[0].status, 'partial');
+  assert.equal(res.body.sources[0].lastSyncStatus, 'ready');
+  assert.equal(res.body.sources[0].lastSyncAt, completedAt);
+  assert.equal(res.body.sources[0].capturedAt, NOW);
+  assert.equal(res.body.sources[0].lastSyncErrorCode, 'partial_refresh');
+  assert.equal(res.body.sources[0].warningCount, 1);
+  assert.doesNotMatch(JSON.stringify(res.body), /PRIVATE_|rawError/);
+});
+
+test('recent collection metadata is sanitized rather than copied from provider results', async () => {
+  const { handler } = setup({ results: { instagram: { status: 'recent', retryAt: 'PRIVATE_URL',
+    lastSyncStatus: 'PRIVATE_STATUS', lastSyncErrorCode: 'PRIVATE_ERROR' },
+  tiktok: { status: 'recent', retryAt: NOW, lastSyncStatus: 'ready', lastSyncErrorCode: 'partial_refresh' } } }), res = response();
+  await handler(request(), res);
+  assert.equal(res.body.sources[0].retryAt, null);
+  assert.equal(res.body.sources[0].lastSyncStatus, null);
+  assert.equal(res.body.sources[0].lastSyncErrorCode, null);
+  assert.equal(res.body.sources[1].status, 'recent');
+  assert.equal(res.body.sources[1].lastSyncErrorCode, 'partial_refresh');
+  assert.doesNotMatch(JSON.stringify(res.body), /PRIVATE_/);
+});

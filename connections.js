@@ -42,12 +42,22 @@ let statusPending = false;
 let teamAccess = false;
 let reviewedStudioReport = null;
 let instagramManualCapture = null;
+let instagramBrowser = null;
+let browserPending = false;
+let browserPollTimer = null;
+let browserPollDeadline = 0;
 
 function setTeamAccess(allowed) {
   teamAccess = allowed === true;
   document.querySelectorAll('[data-team-control]').forEach(element => { element.hidden = !teamAccess; });
   $('#team-controls-link').hidden = teamAccess;
   $('#team-sign-out').hidden = !teamAccess;
+  if (!teamAccess) {
+    clearTimeout(browserPollTimer);
+    $('#instagram-browser-key').value = '';
+    $('#instagram-browser-live').hidden = true;
+    $('#instagram-browser-live').removeAttribute('href');
+  }
   if (current) renderStatus();
 }
 
@@ -56,9 +66,132 @@ async function loadTeamAccess() {
     const response = await fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' });
     const result = response.ok ? await response.json() : null;
     setTeamAccess(response.ok && result?.authenticated === true);
+    if (teamAccess) await loadInstagramBrowser();
   } catch {
     setTeamAccess(false);
   }
+}
+
+function browserMessage(text, success = false) {
+  const host = $('#instagram-browser-message');
+  host.hidden = !text;
+  host.textContent = text;
+  host.classList.toggle('success', success);
+}
+
+export function instagramBrowserLiveUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && (url.hostname === 'browserbase.com' || url.hostname.endsWith('.browserbase.com'))
+      && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
+
+export async function instagramBrowserRequest(action = null, values = {}) {
+  const response = await fetch('/api/connections/instagram-browser', {
+    method: action ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store',
+    ...(action ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...values }) } : {}),
+  });
+  let data;
+  try { data = await response.json(); } catch { data = {}; }
+  return { ok: response.ok, status: response.status, data };
+}
+
+function renderInstagramBrowser() {
+  if (!teamAccess) return;
+  const state = instagramBrowser?.state || 'not-configured';
+  const labels = { 'not-configured': 'Setup needed', ready: 'Login verified', 'login-required': 'Login needed',
+    connecting: 'Waiting for Instagram login', failed: 'Needs attention' };
+  $('#instagram-browser-state').textContent = labels[state] || 'Status unavailable';
+  $('#instagram-browser-state').className = `pill ${state === 'ready' ? 'connected' : 'pending'}`;
+  $('#instagram-browser-details').innerHTML = [
+    ['Browser configuration', instagramBrowser?.configured ? 'Saved privately' : 'Not configured'],
+    ['Instagram login verified', instagramBrowser?.verifiedAt ? formatDate(instagramBrowser.verifiedAt) : 'Not verified'],
+    ['Last successful scan', instagramBrowser?.lastScanAt ? formatDate(instagramBrowser.lastScanAt) : 'No browser scan saved yet'],
+  ].map(([label, value]) => `<div><dt>${escapeHTML(label)}</dt><dd>${escapeHTML(value)}</dd></div>`).join('');
+  document.querySelectorAll('#instagram-browser-configure input,#instagram-browser-save').forEach(element => { element.disabled = browserPending; });
+  $('#instagram-browser-start').disabled = browserPending || !instagramBrowser?.configured;
+  $('#instagram-browser-check').disabled = browserPending;
+  $('#instagram-browser-save').textContent = browserPending ? 'Working…' : 'Save browser configuration';
+  if (state !== 'connecting') {
+    $('#instagram-browser-live').hidden = true;
+    $('#instagram-browser-live').removeAttribute('href');
+  }
+}
+
+function pollInstagramBrowser() {
+  clearTimeout(browserPollTimer);
+  if (!teamAccess || instagramBrowser?.state !== 'connecting') return;
+  if (!browserPollDeadline) browserPollDeadline = Date.now() + 600_000;
+  if (Date.now() >= browserPollDeadline) {
+    browserMessage('Login checking paused. Use Check browser status after completing Instagram sign-in.');
+    return;
+  }
+  browserPollTimer = setTimeout(() => loadInstagramBrowser(), 5_000);
+}
+
+async function loadInstagramBrowser() {
+  if (!teamAccess) return;
+  try {
+    const response = await instagramBrowserRequest();
+    if ([401, 403].includes(response.status)) { setTeamAccess(false); return; }
+    if (!response.ok || typeof response.data.configured !== 'boolean') throw Error('unavailable');
+    const previous = instagramBrowser?.state;
+    instagramBrowser = response.data;
+    renderInstagramBrowser();
+    if (instagramBrowser.state === 'ready' && previous !== 'ready') {
+      browserPollDeadline = 0;
+      browserMessage('Instagram login verified. Refresh Instagram to collect a dated cloud scan.', true);
+      await loadStatus();
+    } else if (instagramBrowser.state === 'failed') {
+      browserMessage('The browser connection could not be verified. Open the cloud login again.');
+    } else if (instagramBrowser.state === 'login-required' && previous === 'connecting') {
+      browserMessage('Instagram sign-in is needed. Open the cloud login again.');
+    }
+    pollInstagramBrowser();
+  } catch {
+    browserMessage('Browser status could not be checked. Saved reports are unchanged.');
+    pollInstagramBrowser();
+  }
+}
+
+async function saveInstagramBrowser(event) {
+  event.preventDefault();
+  if (!teamAccess || browserPending || !$('#instagram-browser-configure').reportValidity()) return;
+  browserPending = true; renderInstagramBrowser();
+  const values = { apiKey: $('#instagram-browser-key').value.trim() };
+  const projectId = $('#instagram-browser-project').value.trim();
+  if (projectId) values.projectId = projectId;
+  $('#instagram-browser-key').value = '';
+  try {
+    const response = await instagramBrowserRequest('configure', values);
+    if ([401, 403].includes(response.status)) { setTeamAccess(false); return; }
+    if (!response.ok) throw Error('unavailable');
+    browserMessage('Browser configuration saved. Open the cloud Instagram login to connect @scranpints.', true);
+    await loadInstagramBrowser();
+    await loadStatus();
+  } catch { browserMessage('Browser configuration could not be saved. Check the key and try again.'); }
+  finally { values.apiKey = ''; browserPending = false; renderInstagramBrowser(); }
+}
+
+async function startInstagramBrowser() {
+  if (!teamAccess || browserPending || !instagramBrowser?.configured) return;
+  browserPending = true; renderInstagramBrowser();
+  try {
+    const response = await instagramBrowserRequest('start');
+    if ([401, 403].includes(response.status)) { setTeamAccess(false); return; }
+    const liveUrl = instagramBrowserLiveUrl(response.data.liveViewUrl);
+    if (!response.ok || !liveUrl) throw Error('unavailable');
+    instagramBrowser = { ...instagramBrowser, state: 'connecting', sessionExpiresAt: response.data.expiresAt };
+    const link = $('#instagram-browser-live');
+    link.href = liveUrl; link.hidden = false;
+    window.open(liveUrl, '_blank', 'noopener,noreferrer');
+    browserMessage('Complete Instagram sign-in in the private cloud tab. This page checks when it is ready.');
+    const expires = Date.parse(response.data.expiresAt);
+    browserPollDeadline = Math.min(Date.now() + 600_000, Number.isFinite(expires) ? expires : Infinity);
+    pollInstagramBrowser();
+  } catch { browserMessage('The cloud login could not be opened. Check the browser configuration and try again.'); }
+  finally { browserPending = false; renderInstagramBrowser(); }
 }
 
 function message(text, success = false) {
@@ -66,7 +199,7 @@ function message(text, success = false) {
   $('#connection-message').textContent = text;
   $('#connection-message').classList.toggle('success', success);
 }
-function instagramCapturedReport(source){const capture=source?.id==='instagram'?source.manualCapture:null;if(capture?.method!=='manual-browser-inspection'||!Array.isArray(capture.windows))return null;const window=capture.windows.find(row=>row.periodDays===90);return window?{capture,window,manualOnly:source.provenance?.kind==='manual-browser'}:null;}
+function instagramCapturedReport(source){const capture=source?.id==='instagram'?source.manualCapture:null;if(!['manual-browser-inspection','browser-sweep'].includes(capture?.method)||!Array.isArray(capture.windows))return null;const window=capture.windows.find(row=>row.periodDays===90)||[...capture.windows].sort((a,b)=>b.periodDays-a.periodDays)[0];return window?{capture,window,manualOnly:source.provenance?.kind==='manual-browser',browserSweep:capture.method==='browser-sweep'}:null;}
 function renderStatus() {
   const platforms = new Map(current.platforms.map(platform => [platform.id, platform]));
   for (const source of sourceIds) {
@@ -75,24 +208,25 @@ function renderStatus() {
     const status = card.querySelector('[data-field="status"]');
     const connected = platform.connected === true;
     const manual = source === 'instagram' ? instagramManualCapture : null;
+    const browserMode = source === 'instagram' && platform.mode === 'browser-sweep';
     const publicReady = source === 'youtube' && current.setup?.youtubePublic === true;
     const verified = current.configured === true;
-    status.textContent = manual ? connected ? 'API connected · native capture saved' : 'Native capture available' : !verified ? 'Status unavailable' : connected ? 'Connected' : publicReady ? 'Public counters ready' : 'Setup needed';
+    status.textContent = browserMode ? connected ? 'Browser scans ready' : manual ? 'Saved capture · login needed' : 'Browser login needed' : manual ? connected ? 'API connected · native capture saved' : 'Native capture available' : !verified ? 'Status unavailable' : connected ? 'Connected' : publicReady ? 'Public counters ready' : 'Setup needed';
     status.className = `pill ${manual || verified && (connected || publicReady) ? 'connected' : 'pending'}`;
     const lastSync = platform.lastSync;
     const syncLabel = !lastSync ? 'No run recorded' : lastSync.status === 'ready' ? lastSync.errorCode === 'partial_refresh' ? 'Saved with gaps' : 'Completed' :
       { failed: 'Failed · previous data kept', blocked: 'Setup blocked', busy: 'Already running', 'not-connected': 'Not connected' }[lastSync.status] || 'Needs attention';
     card.querySelector('[data-field="details"]').innerHTML = [
-      [manual ? 'API connection' : 'Reporting connection', !verified ? 'Could not be checked' : connected ? `Saved ${formatDate(platform.connectedAt)}` : 'Not connected'],
-      ...(manual ? [['Native report captured', formatDate(manual.capture.capturedAt)], ['Instagram views · Last 90 days', new Intl.NumberFormat('en-GB').format(manual.window.instagramViews)], ['Followers at capture', new Intl.NumberFormat('en-GB').format(manual.capture.followers)]] : []),
+      [browserMode ? 'Browser connection' : manual ? 'API connection' : 'Reporting connection', !verified ? 'Could not be checked' : connected ? platform.connectedAt ? `Saved ${formatDate(platform.connectedAt)}` : 'Ready' : 'Not connected'],
+      ...(manual ? [[manual.browserSweep ? 'Cloud scan captured' : 'Native report captured', formatDate(manual.capture.capturedAt)], [`Instagram views · Last ${manual.window.periodDays} days`, new Intl.NumberFormat('en-GB').format(manual.window.instagramViews)], ['Followers at capture', new Intl.NumberFormat('en-GB').format(manual.capture.followers)]] : []),
       ...(source === 'youtube' ? [['Public counters', publicReady ? 'Public API configured' : 'Public API key needed']] : []),
-      [manual ? 'Latest saved API collection' : 'Latest saved collection', manual?.manualOnly ? 'Not collected through API' : !verified ? 'Could not be checked' : platform.hasSnapshot ? formatDate(platform.capturedAt) : 'No cloud collection yet'],
+      [browserMode ? 'Latest saved cloud scan' : manual ? 'Latest saved API collection' : 'Latest saved collection', browserMode ? manual?.browserSweep ? formatDate(manual.capture.capturedAt) : 'No browser scan saved yet' : manual?.manualOnly ? 'Not collected through API' : !verified ? 'Could not be checked' : platform.hasSnapshot ? formatDate(platform.capturedAt) : 'No cloud collection yet'],
       ['Last refresh', !verified ? 'Could not be checked' : `${syncLabel}${lastSync?.completedAt ? ` · ${formatDate(lastSync.completedAt)}` : ''}`],
     ].map(([label, value]) => `<div><dt>${escapeHTML(label)}</dt><dd>${escapeHTML(value)}</dd></div>`).join('');
     let help;
     if (source === 'youtube') help = connected ? 'The channel owner has connected YouTube Analytics. Channel, episode and packaging reports keep their own source dates.' : publicReady ? 'Public channel counters are available. An owner connection is needed for watch time, retention and other YouTube Analytics reports.' : 'YouTube reporting has not been configured yet.';
     if (source === 'youtube-shorts') help = connected ? 'Shorts reporting uses the channel’s YouTube connection. Views and engaged views are reported separately.' : 'A YouTube owner connection is needed to collect a separate Shorts Analytics report.';
-    if (source === 'instagram') help = manual ? `Native Insights captured ${formatDate(manual.capture.capturedAt)} are available on the dashboard and YEET. ${!verified ? 'The API connection status could not be verified.' : connected ? 'The separate API connection can collect its available reports.' : 'The API is not connected.'} Refresh does not update this manual capture; the team records a new capture to advance it.` : connected ? 'The account is connected. A refresh collects available media counters, daily views and follower demographics.' : 'A Creator account works too. The Meta app must be configured before the owner can approve read-only reporting.';
+    if (source === 'instagram') help = browserMode ? connected ? 'Hosted browser access is verified. Refresh starts a cloud scan of available Instagram and collab Insights; each successful capture keeps its own date.' : 'Cloud Instagram sign-in is needed before a new scan can run. The latest saved capture remains available.' : manual ? `Native Insights captured ${formatDate(manual.capture.capturedAt)} are available on the dashboard and YEET. ${!verified ? 'The API connection status could not be verified.' : connected ? 'The separate API connection can collect its available reports.' : 'The API is not connected.'} ${manual.browserSweep ? 'This dated cloud scan remains until a newer successful scan is saved.' : 'Refresh does not update this manual capture; the team records a new capture to advance it.'}` : connected ? 'The account is connected. A refresh collects available media counters, daily views and follower demographics.' : 'The team can connect hosted browser scans or available Meta API reporting.';
     if (source === 'tiktok') help = connected ? 'A reporting grant is stored. A refresh collects the counters the connected app is allowed to read.' : 'A TikTok developer app, approved scopes and account authorisation still need setup. No TikTok connection has been recorded.';
     card.querySelector('[data-field="help"]').textContent = verified || manual ? help : 'Connection status could not be verified. Previously collected reports remain available.';
     const button = card.querySelector('[data-sync]');
@@ -106,7 +240,7 @@ function renderStatus() {
   for (const id of ['instagram', 'tiktok']) {
     const connect = $(`#connect-${id}`);
     connect.disabled = !teamAccess || !current.configured || !current.setup?.[`${id}OAuth`] || !!busySource || statusPending;
-    connect.textContent = `${platforms.get(id)?.connected ? 'Reconnect' : 'Connect'} ${sourceNames[id]} ↗`;
+    connect.textContent = id === 'instagram' ? `${platforms.get(id)?.mode === 'official-api' && platforms.get(id)?.connected ? 'Reconnect' : 'Connect'} Meta API ↗` : `${platforms.get(id)?.connected ? 'Reconnect' : 'Connect'} ${sourceNames[id]} ↗`;
   }
   $('#reload-status').disabled = !!busySource || statusPending;
   document.querySelectorAll('#studio-import-form input,#studio-import-review').forEach(input => { input.disabled = !teamAccess || !!busySource || statusPending; });
@@ -281,7 +415,10 @@ async function sync(source) {
     if (current) renderStatus();
   }
 }
-$('#reload-status').addEventListener('click', () => loadStatus());
+$('#reload-status').addEventListener('click', () => { loadStatus(); if (teamAccess) loadInstagramBrowser(); });
+$('#instagram-browser-configure').addEventListener('submit', saveInstagramBrowser);
+$('#instagram-browser-start').addEventListener('click', startInstagramBrowser);
+$('#instagram-browser-check').addEventListener('click', () => { browserPollDeadline = 0; loadInstagramBrowser(); });
 document.querySelectorAll('[data-sync]').forEach(button => button.addEventListener('click', () => sync(button.dataset.sync)));
 for (const id of ['youtube', 'instagram', 'tiktok']) {
   $(`#connect-${id}`).form.addEventListener('submit', event => {

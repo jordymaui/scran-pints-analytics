@@ -1,17 +1,26 @@
-import { createCloudStore } from '../lib/cloud-store.mjs';
+import { createCloudStore, publicSyncErrorCode } from '../lib/cloud-store.mjs';
 import { syncCloudSource } from '../lib/cloud-sync.mjs';
 import { sameOriginPost, AuthError, json } from '../lib/auth.mjs';
 import { PUBLIC_REFRESH_INTERVAL_MS } from './public-refresh.mjs';
 
 const SOURCES = Object.freeze(['instagram', 'tiktok']);
-const OUTCOMES = new Set(['refreshed', 'recent', 'busy', 'failed', 'not-connected']);
+const OUTCOMES = new Set(['refreshed', 'partial', 'recent', 'busy', 'failed', 'not-connected']);
+const SYNC_STATUSES = new Set(['ready', 'failed', 'blocked', 'not-connected', 'busy']);
+const BROWSER_STATES = new Set(['not-configured', 'configured', 'ready', 'login-required', 'connecting', 'failed']);
+const timestamp = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value) && Number.isFinite(Date.parse(value)) ? value : null;
+const warningCount = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
 function publicStates(values) {
   return SOURCES.map(id => {
     const row = values?.find(value => value?.id === id) || {};
-    const capturedAt = typeof row.capturedAt === 'string' && Number.isFinite(Date.parse(row.capturedAt)) ? row.capturedAt : null;
-    const lastSyncStatus = ['ready', 'failed', 'blocked', 'not-connected', 'busy'].includes(row.lastSyncStatus) ? row.lastSyncStatus : null;
+    const capturedAt = timestamp(row.capturedAt), lastSyncAt = timestamp(row.lastSyncAt);
+    const lastSyncStatus = SYNC_STATUSES.has(row.lastSyncStatus) ? row.lastSyncStatus : null;
+    const lastSyncErrorCode = publicSyncErrorCode(row.lastSyncErrorCode), warnings = warningCount(row.warningCount);
     return { id, connected: row.connected === true, running: row.running === true, capturedAt, lastSyncStatus,
-      status: !row.connected ? 'not-connected' : row.running ? 'busy' : lastSyncStatus === 'ready' && capturedAt ? 'refreshed' : 'failed' };
+      lastSyncAt, lastSyncErrorCode, warningCount: warnings,
+      mode: ['browser-sweep', 'official-api'].includes(row.mode) ? row.mode : null,
+      browserState: BROWSER_STATES.has(row.browserState) ? row.browserState : null,
+      status: !row.connected ? 'not-connected' : row.running ? 'busy' : lastSyncStatus === 'ready' && (capturedAt || lastSyncAt)
+        ? lastSyncErrorCode === 'partial_refresh' || warnings > 0 ? 'partial' : 'refreshed' : 'failed' };
   });
 }
 function appOrigin(env) {
@@ -52,9 +61,15 @@ export function createPublicSocialRefreshHandler({ env = process.env, fetchImpl 
         try {
           const result = await synchronize({ source: row.id, store, env, fetchImpl: boundedFetch,
             trigger: 'manual', minimumIntervalMs: PUBLIC_REFRESH_INTERVAL_MS });
-          const status = result.status === 'ready' ? 'refreshed' : OUTCOMES.has(result.status) ? result.status : 'failed';
+          const status = result.status === 'ready' ? result.errorCode === 'partial_refresh' || warningCount(result.warningCount) > 0
+            ? 'partial' : 'refreshed' : OUTCOMES.has(result.status) ? result.status : 'failed';
           return { id: row.id, status,
-            ...(status === 'recent' ? { retryAt: result.retryAt, lastSyncStatus: result.lastSyncStatus } : {}) };
+            ...(result.status === 'ready' ? { lastSyncStatus: 'ready', lastSyncErrorCode: publicSyncErrorCode(result.errorCode),
+              ...(timestamp(result.completedAt) ? { lastSyncAt: timestamp(result.completedAt) } : {}),
+              ...(result.warningCount !== undefined ? { warningCount: warningCount(result.warningCount) } : {}) } : {}),
+            ...(status === 'recent' ? { retryAt: timestamp(result.retryAt),
+              ...(result.lastSyncStatus !== undefined ? { lastSyncStatus: SYNC_STATUSES.has(result.lastSyncStatus) ? result.lastSyncStatus : null } : {}),
+              ...(result.lastSyncErrorCode !== undefined ? { lastSyncErrorCode: publicSyncErrorCode(result.lastSyncErrorCode) } : {}) } : {}) };
         } catch { return { id: row.id, status: 'failed' }; }
       }));
       const after = publicStates(await store.getPublicSocialRefreshState());

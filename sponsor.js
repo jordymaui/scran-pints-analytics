@@ -324,7 +324,7 @@ export async function syncPublicYouTube({ request = fetch, now = Date.now,
 
 export async function syncPublicSocial({ request = fetch, now = Date.now,
   wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)), timeout = 285_000 } = {}) {
-  const deadline = now() + timeout;
+  const startedAt = now(), deadline = startedAt + timeout;
   const read = async method => {
     const remaining = deadline - now();
     if (remaining <= 0) throw Error('Refresh timed out');
@@ -337,17 +337,24 @@ export async function syncPublicSocial({ request = fetch, now = Date.now,
     } finally { clearTimeout(timer); }
   };
   const entries = await read('POST');
-  const pending = new Map(entries.filter(entry => entry.status === 'busy').map(entry => [entry.id, entry.capturedAt]));
+  const pending = new Map(entries.filter(entry => entry.status === 'busy').map(entry => [entry.id,
+    { capturedAt: entry.capturedAt, lastSyncAt: entry.lastSyncAt }]));
   while (pending.size && now() < deadline) {
     await wait(Math.min(3_000, deadline - now()));
     const saved = await read('GET');
     for (const [id, baseline] of pending) {
       const entry = saved.find(value => value.id === id);
       if (!entry || entry.running) continue;
-      const advanced = Number.isFinite(Date.parse(entry.capturedAt)) && (!baseline || Date.parse(entry.capturedAt) > Date.parse(baseline));
-      if (entry.status !== 'failed' && entry.lastSyncStatus !== 'failed' && !advanced) continue;
+      const completedAt = Date.parse(entry.lastSyncAt), previousCompletion = Date.parse(baseline.lastSyncAt);
+      const hasCompletion = Number.isFinite(completedAt) || Number.isFinite(previousCompletion);
+      const advanced = hasCompletion ? Number.isFinite(completedAt) && (Number.isFinite(previousCompletion)
+        ? completedAt > previousCompletion : completedAt >= startedAt)
+        : Number.isFinite(Date.parse(entry.capturedAt)) && (!baseline.capturedAt || Date.parse(entry.capturedAt) > Date.parse(baseline.capturedAt));
+      const failed = entry.status === 'failed' || ['failed', 'blocked', 'not-connected'].includes(entry.lastSyncStatus);
+      if (hasCompletion && !advanced || !hasCompletion && !failed && !advanced) continue;
       const index = entries.findIndex(value => value.id === id);
-      entries[index] = entry.status === 'failed' || entry.lastSyncStatus === 'failed' ? { ...entry, status: 'failed' } : { ...entry, status: 'refreshed' };
+      entries[index] = { ...entry, status: failed ? 'failed' : entry.status === 'partial' ||
+        entry.lastSyncErrorCode === 'partial_refresh' || entry.warningCount > 0 ? 'partial' : 'refreshed' };
       pending.delete(id);
     }
   }
@@ -371,7 +378,8 @@ export function socialRefreshMessages(entries, before, after) {
     const days = [...new Set(values.map(captureDate).filter(Boolean))].sort();
     return days.length ? days.length === 1 ? format(days[0]) : `${format(days[0])}–${format(days.at(-1))}` : null;
   };
-  const isManual = source => source?.provenance?.kind === 'manual-browser' || source?.snapshotOrigin === 'manual-capture';
+  const isManual = source => ['manual-browser', 'browser-sweep'].includes(source?.provenance?.kind) ||
+    ['manual-capture', 'browser-sweep'].includes(source?.snapshotOrigin);
   const accountCapture = source => isManual(source) ? source.manualCapture?.capturedAt || source.capturedAt : source?.capturedAt;
   const collabCaptures = value => new Map((sourceOf(value, 'instagram')?.manualCapture?.collaborations?.posts || [])
     .filter(post => post.relationship === 'collaboration')
@@ -384,7 +392,8 @@ export function socialRefreshMessages(entries, before, after) {
     (timestamp(oldCollabs.get(id)) === null || timestamp(value) > timestamp(oldCollabs.get(id)))).length;
   const instagramDate = datesLabel([accountCapture(instagram)]);
   const igEntry = (entries || []).find(entry => entry.id === 'instagram');
-  const failed = entry => entry?.status === 'failed' || entry?.status === 'recent' && entry.lastSyncStatus === 'failed';
+  const failed = entry => entry?.status === 'failed' || ['failed', 'blocked', 'not-connected'].includes(entry?.lastSyncStatus);
+  const partial = entry => entry?.status === 'partial' || entry?.lastSyncErrorCode === 'partial_refresh' || entry?.warningCount > 0;
   const disconnected = entry => entry?.connected === false || entry?.status === 'not-connected';
   const messages = [];
   let combined = false;
@@ -396,10 +405,18 @@ export function socialRefreshMessages(entries, before, after) {
     const advanced = !isManual(instagram) && timestamp(instagram?.capturedAt) !== null &&
       (isManual(oldInstagram) || timestamp(oldInstagram?.capturedAt) === null ||
         timestamp(instagram.capturedAt) > timestamp(oldInstagram.capturedAt));
+    const browser = igEntry?.mode === 'browser-sweep' || instagram?.manualCapture?.method === 'browser-sweep' || instagram?.provenance?.kind === 'browser-sweep';
+    const nativeAdvanced = isManual(instagram) && timestamp(accountCapture(instagram)) !== null &&
+      (timestamp(accountCapture(oldInstagram)) === null || timestamp(accountCapture(instagram)) > timestamp(accountCapture(oldInstagram)));
     if (disconnected(igEntry)) messages.push(`Instagram: ${saved}; not refreshed.`);
     else if (failed(igEntry)) messages.push(`Instagram refresh failed; ${saved}.`);
+    else if (igEntry?.status === 'recent' && igEntry.lastSyncStatus === 'ready' && browser) messages.push(`Instagram: recent browser scan${partial(igEntry) ? ' had gaps' : ''}; ${saved}.`);
+    else if (igEntry?.status === 'partial') messages.push(nativeAdvanced || advanced
+      ? `Instagram: available reports updated${instagramDate ? ` ${instagramDate}` : ''}; some captures retained.`
+      : `Instagram scan completed with gaps; account capture ${saved}; retained.`);
+    else if (igEntry?.status === 'refreshed' && browser && nativeAdvanced) messages.push(`Instagram Insights refreshed${instagramDate ? ` ${instagramDate}` : ''}.`);
     else if (isManual(instagram)) messages.push(`Instagram: ${saved}; not refreshed.`);
-    else if (igEntry?.status === 'recent') messages.push(`Instagram: refreshed recently; ${saved}.`);
+    else if (igEntry?.status === 'recent' && igEntry.lastSyncStatus === 'ready') messages.push(`Instagram: refreshed recently${partial(igEntry) ? ' with gaps' : ''}; ${saved}.`);
     else if (igEntry?.status === 'refreshed' && advanced) messages.push(`Instagram account data refreshed${instagramDate ? ` ${instagramDate}` : ''}.`);
     else messages.push(`Instagram: ${saved}; ${igEntry ? 'no newer capture' : 'refresh unconfirmed'}.`);
     const manualDate = datesLabel([instagram?.manualCapture?.capturedAt]);
@@ -423,7 +440,8 @@ export function socialRefreshMessages(entries, before, after) {
       timestamp(tiktok.capturedAt) > timestamp(oldTikTok.capturedAt));
     if (disconnected(tiktokEntry)) messages.push(`TikTok: ${saved}; not refreshed.`);
     else if (failed(tiktokEntry)) messages.push(`TikTok refresh failed; ${saved}.`);
-    else if (tiktokEntry?.status === 'recent') messages.push(`TikTok public counters: refreshed recently; ${saved}.`);
+    else if (tiktokEntry?.status === 'recent' && tiktokEntry.lastSyncStatus === 'ready') messages.push(`TikTok public counters: refreshed recently${partial(tiktokEntry) ? ' with gaps' : ''}; ${saved}.`);
+    else if (tiktokEntry?.status === 'partial') messages.push(`TikTok: ${advanced ? 'available counters updated' : saved}; collection has gaps.`);
     else if (tiktokEntry?.status === 'refreshed' && advanced) messages.push(`TikTok public counters refreshed${savedDate ? ` ${savedDate}` : ''}.`);
     else messages.push(`TikTok: ${saved}; ${tiktokEntry ? 'no newer capture' : 'refresh unconfirmed'}.`);
   }

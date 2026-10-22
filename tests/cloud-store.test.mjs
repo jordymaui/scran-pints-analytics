@@ -82,7 +82,7 @@ test('connection statuses expose only safe dates and sync outcomes, including th
   assert.equal(result[1].connected, true);
   assert.equal(result[2].connected, false);
   assert.equal(result[0].hasSnapshot, true);
-  assert.deepEqual(result[0].lastSync, { status: 'failed', errorCode: 'authorization', completedAt: '2026-10-20T12:00:00.123Z' });
+  assert.deepEqual(result[0].lastSync, { status: 'failed', errorCode: 'authorization', completedAt: '2026-10-20T12:00:00.123Z', warningCount: null });
   assert.doesNotMatch(JSON.stringify(result), /NEVER_RETURN|private-account|provider response|credentials|payload/);
   assert.ok(calls.every(call => !call.url.includes('select=*')));
 });

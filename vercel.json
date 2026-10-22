@@ -17,7 +17,7 @@
     "api/workshop-notebook.mjs": { "maxDuration": 60 },
     "api/connection-status.mjs": { "maxDuration": 60 },
     "api/connections/youtube.mjs": { "maxDuration": 60 },
-    "api/connections/instagram.mjs": { "maxDuration": 60 },
+    "api/connections/instagram.mjs": { "maxDuration": 300 },
     "api/connections/tiktok.mjs": { "maxDuration": 60 },
     "api/auth/*.mjs": { "maxDuration": 30 }
   },
@@ -67,6 +67,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/api/connections/instagram-browser", "destination": "/api/connections/instagram?browser=1" },
     { "source": "/review-room.html", "destination": "/api/private?path=review-room.html" },
     { "source": "/title-table.html", "destination": "/api/private?path=title-table.html" },
     { "source": "/thumbnail-lab.html", "destination": "/api/private?path=thumbnail-lab.html" },
