@@ -7,14 +7,14 @@ const NOW = '2026-10-22T12:00:00.000Z';
 const BEFORE = '2026-10-21T12:00:00.000Z';
 const env = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_SECRET_KEY: 'sb_secret_TEST_ONLY' };
 function fixture({ state = 'ready', mode = 'browser-sweep', warnings = 2, completedAt = NOW,
-  code = 'partial_refresh', runStatus = 'ready' } = {}) {
+  code = 'partial_refresh', runStatus = 'ready', browserExpiresAt = '2026-10-22T12:05:00.000Z' } = {}) {
   const calls = [];
   const store = createCloudStore({ env, fetcher: async (endpoint, init) => {
     const url = new URL(endpoint); calls.push({ url, init });
     let rows = [];
     if (init.method === 'POST') return new Response(null, { status: 204 });
     if (url.pathname.endsWith('analytics_connections')) rows = [
-      { platform: 'instagram', updated_at: NOW, reportingMode: mode, browserState: state,
+      { platform: 'instagram', updated_at: NOW, reportingMode: mode, browserState: state, browserExpiresAt,
         credentials: { browser: { apiKey: 'PRIVATE_KEY', contextId: 'PRIVATE_CONTEXT', liveViewUrl: 'PRIVATE_URL' } } },
       { platform: 'tiktok', updated_at: BEFORE }, { platform: 'youtube', updated_at: BEFORE }
     ];
@@ -32,7 +32,7 @@ const response = () => ({ headers: {}, setHeader(key, value) { this.headers[key]
 test('browser mode is connected only after a verified ready state; legacy API grants keep their behavior', async () => {
   for (const state of ['configured', 'connecting', 'ready', 'login-required', 'failed', 'PRIVATE_STATE', null]) {
     const { store } = fixture({ state });
-    const result = await store.getStatuses(), ig = instagram(result);
+    const result = await store.getStatuses({ now: () => Date.parse(NOW) }), ig = instagram(result);
     assert.equal(ig.mode, 'browser-sweep');
     assert.equal(ig.connected, state === 'ready');
     assert.equal(ig.connectedAt, state === 'ready' ? NOW : null);
@@ -55,11 +55,28 @@ test('status reads select only scalar metadata and collab-only success advances 
     running: false, capturedAt: BEFORE, lastSyncStatus: 'ready', lastSyncAt: NOW,
     lastSyncErrorCode: 'partial_refresh', warningCount: 2 });
   const connectionSelect = calls.find(call => call.url.pathname.endsWith('analytics_connections')).url.searchParams.get('select');
-  assert.equal(connectionSelect, 'platform,updated_at,reportingMode:credentials->>reportingMode,browserState:credentials->browser->>state');
+  assert.equal(connectionSelect, 'platform,updated_at,reportingMode:credentials->>reportingMode,browserState:credentials->browser->>state,browserExpiresAt:credentials->browser->>setupExpiresAt');
   for (const { url } of calls.filter(call => call.url.pathname.endsWith('analytics_sync_runs'))) {
     assert.equal(url.searchParams.get('select'), 'status,error_code,completed_at,warningCount:metadata->warningCount');
   }
   assert.doesNotMatch(JSON.stringify(ig), /PRIVATE_|credentials|contextId|apiKey|liveViewUrl|metadata|message/);
+});
+
+test('public browser status expires stale connecting sessions and rejects missing or malformed expiry', async () => {
+  for (const browserExpiresAt of [BEFORE, NOW, null, '', 'invalid', '2026-02-30T12:00:00Z', { secret: 'PRIVATE' }]) {
+    const { store } = fixture({ state: 'connecting', browserExpiresAt });
+    const ig = instagram(await store.getStatuses({ now: () => Date.parse(NOW) }));
+    assert.equal(ig.browserState, 'login-required');
+    assert.equal(ig.connected, false);
+    const polling = instagram(await store.getPublicSocialRefreshState({ now: () => Date.parse(NOW) }));
+    assert.equal(polling.browserState, 'login-required');
+    assert.equal(polling.connected, false);
+    assert.doesNotMatch(JSON.stringify(polling), /browserExpiresAt|setupExpiresAt|PRIVATE/);
+  }
+  const { store } = fixture({ state: 'connecting', browserExpiresAt: '2026-10-22T12:00:01Z' });
+  assert.equal(instagram(await store.getStatuses({ now: () => Date.parse(NOW) })).browserState, 'connecting');
+  const ready = fixture({ state: 'ready', browserExpiresAt: BEFORE }).store;
+  assert.equal(instagram(await ready.getStatuses()).connected, true, 'Setup expiry does not revoke a verified persistent login');
 });
 
 test('public polling rejects arbitrary codes, warning values and future completion timestamps', async () => {

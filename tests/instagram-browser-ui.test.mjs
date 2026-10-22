@@ -83,6 +83,13 @@ test('cloud login opens only a validated private provider URL and verifies statu
   }
 });
 
+test('saved browser configuration clearly requests login instead of showing an unavailable status', () => {
+  const { context, node } = ui();
+  vm.runInContext("teamAccess=true;instagramBrowser={configured:true,state:'configured'};renderInstagramBrowser();", context);
+  assert.equal(node('#instagram-browser-state').textContent, 'Login needed');
+  assert.equal(node('#instagram-browser-start').disabled, false);
+});
+
 test('cloud sweep captures remain dated native reports rather than pretending to be API collections', () => {
   const captureCode = script.slice(script.indexOf('function instagramCapturedReport('), script.indexOf('function renderStatus('));
   const context = vm.createContext({}); vm.runInContext(captureCode, context);

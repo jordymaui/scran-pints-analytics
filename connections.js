@@ -100,7 +100,7 @@ export async function instagramBrowserRequest(action = null, values = {}) {
 function renderInstagramBrowser() {
   if (!teamAccess) return;
   const state = instagramBrowser?.state || 'not-configured';
-  const labels = { 'not-configured': 'Setup needed', ready: 'Login verified', 'login-required': 'Login needed',
+  const labels = { 'not-configured': 'Setup needed', configured: 'Login needed', ready: 'Login verified', 'login-required': 'Login needed',
     connecting: 'Waiting for Instagram login', failed: 'Needs attention' };
   $('#instagram-browser-state').textContent = labels[state] || 'Status unavailable';
   $('#instagram-browser-state').className = `pill ${state === 'ready' ? 'connected' : 'pending'}`;

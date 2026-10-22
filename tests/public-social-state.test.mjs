@@ -41,7 +41,7 @@ test('social state returns independent leases, dated capture and status without 
   for (const url of calls) {
     for (const column of url.searchParams.get('select').split(',')) {
       if (['reportingMode:credentials->>reportingMode', 'browserState:credentials->browser->>state',
-        'warningCount:metadata->warningCount'].includes(column)) continue;
+        'browserExpiresAt:credentials->browser->>setupExpiresAt', 'warningCount:metadata->warningCount'].includes(column)) continue;
       assert.doesNotMatch(column, /\*|credentials|account_id|payload|owner|metadata|message/);
     }
   }
