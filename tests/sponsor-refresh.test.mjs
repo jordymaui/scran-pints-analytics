@@ -164,3 +164,67 @@ test('overlapping clicks share one pending provider request', async () => {
   assert.match(vm.runInContext('refreshMessage', context), /Available YouTube data updated/);
   assert.equal(vm.runInContext('refreshing', context), false);
 });
+
+const manualReport = () => ({ sources: [{ id: 'instagram', capturedAt: '2026-10-20T12:00:00Z',
+  provenance: { kind: 'manual-browser' }, manualCapture: { capturedAt: '2026-10-20T12:00:00Z',
+    collaborations: { capturedAt: '2026-10-20T13:00:00Z', posts: [1, 2].map(id => ({
+      shortcode: `synthetic_${id}`, relationship: 'collaboration', views: 10, viewsPrecision: 'exact',
+      capturedAt: '2026-10-20T12:00:00Z', insights: { views: 12, capturedAt: '2026-10-20T13:00:00Z' },
+    })) } } }] });
+const instagramResult = (status, extra = {}) => [{ id: 'instagram', status, connected: status !== 'not-connected', ...extra }];
+
+test('disconnected Instagram explicitly retains both dated account and FootyScran captures', () => {
+  const context = setup(async () => { throw Error('unexpected fetch'); });
+  const before = manualReport(), after = structuredClone(before);
+  const message = context.socialRefreshMessages(instagramResult('not-connected'), before, after).join(' ');
+  assert.match(message, /Instagram \+ FootyScran/);
+  assert.match(message, /20 Oct/);
+  assert.match(message, /not refreshed/);
+  assert.doesNotMatch(message, /Instagram.*updated|latest/i);
+  assert.deepEqual(after, before);
+});
+
+test('a fresh official account report cannot make retained collaboration captures look refreshed', () => {
+  const context = setup(async () => { throw Error('unexpected fetch'); });
+  const before = manualReport(), after = structuredClone(before);
+  Object.assign(after.sources[0], { capturedAt: '2026-10-21T14:00:00Z', provenance: { kind: 'official-api' } });
+  const message = context.socialRefreshMessages(instagramResult('refreshed'), before, after).join(' ');
+  assert.match(message, /Instagram.*updated|Instagram.*refreshed/i);
+  assert.match(message, /FootyScran.*not refreshed/i);
+  assert.match(message, /20 Oct/);
+});
+
+test('one newer collab and campaign-only capture dates cannot imply a fully refreshed FootyScran set', () => {
+  const context = setup(async () => { throw Error('unexpected fetch'); });
+  const before = manualReport(), after = structuredClone(before);
+  const collabs = after.sources[0].manualCapture.collaborations;
+  collabs.capturedAt = '2026-10-21T14:00:00Z';
+  collabs.posts.push({ shortcode: 'own_post', relationship: 'campaign-post', views: 90000,
+    capturedAt: '2026-10-21T14:00:00Z' });
+  let message = context.socialRefreshMessages(instagramResult('refreshed'), before, after).join(' ');
+  assert.match(message, /not refreshed/);
+  collabs.posts[0].insights.capturedAt = '2026-10-21T14:00:00Z';
+  message = context.socialRefreshMessages(instagramResult('refreshed'), before, after).join(' ');
+  assert.match(message, /1\/2|1 of 2/);
+  assert.doesNotMatch(message, /FootyScran.*fully refreshed/i);
+});
+
+test('all collab post captures must advance before a fully newer saved set is reported', () => {
+  const context = setup(async () => { throw Error('unexpected fetch'); });
+  const before = manualReport(), after = structuredClone(before);
+  for (const post of after.sources[0].manualCapture.collaborations.posts) post.insights.capturedAt = '2026-10-21T14:00:00Z';
+  const message = context.socialRefreshMessages(instagramResult('refreshed'), before, after).join(' ');
+  assert.match(message, /FootyScran.*(?:updated|newer).*captures loaded/i);
+  assert.doesNotMatch(message, /FootyScran.*not refreshed/i);
+});
+
+test('recent or failed API outcomes cannot label unchanged Instagram captures updated', () => {
+  const context = setup(async () => { throw Error('unexpected fetch'); });
+  const before = manualReport();
+  before.sources[0].provenance.kind = 'official-api';
+  for (const result of [instagramResult('recent', { lastSyncStatus: 'ready' }), instagramResult('failed')]) {
+    const message = context.socialRefreshMessages(result, before, structuredClone(before)).join(' ');
+    assert.doesNotMatch(message, /Instagram data updated|FootyScran.*updated/i);
+    assert.match(message, /saved|recent|kept|not refreshed/i);
+  }
+});
