@@ -69,6 +69,18 @@ test('lease acquisition and release preserve owner identity and bound expiration
   await assert.rejects(store.acquireSyncLock('youtube', { owner, expiresAt: new Date(Date.now() + 3600_000).toISOString() }));
 });
 
+test('growing YouTube snapshots persist beyond 8 MB and remain bounded on reads and writes', async () => {
+  const capturedAt = '2026-11-02T12:00:00Z';
+  const payload = { capturedAt, evidence: 'x'.repeat(12_000_000) };
+  const { store, calls } = fakeStore([true, [{ payload, captured_at: capturedAt, status: 'ready' }]]);
+  assert.deepEqual(await store.saveSnapshot('youtube', payload), { saved: true });
+  assert.equal((await store.loadSnapshot('youtube')).payload.evidence.length, 12_000_000);
+  await assert.rejects(store.saveSnapshot('tiktok', payload), error => error.code === 'invalid-input');
+  await assert.rejects(store.saveSnapshot('youtube', { capturedAt, evidence: 'x'.repeat(32_000_000) }),
+    error => error.code === 'invalid-input');
+  assert.equal(calls.length, 2);
+});
+
 test('connection statuses expose only safe dates and sync outcomes, including the shared YouTube grant', async () => {
   const time = '2026-10-20T12:00:00.123456+00:00';
   const { store, calls } = fakeStore([
