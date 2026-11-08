@@ -36,6 +36,14 @@
       <div id="connection-message" class="notice" role="status" hidden></div>
       <div class="connection-toolbar"><p>Connection status is checked from the server. Each report keeps its own collection date.</p><button class="button secondary" id="reload-status" type="button">Check status ↻</button></div>
       <section class="connection-grid" aria-label="Social reporting sources">
+        <article class="connection-card" aria-label="X reporting">
+          <div class="connection-card-top"><span class="source-number">X</span><span class="pill" id="x-native-status">Checking capture</span></div>
+          <h2><img src="/assets/platforms/x.svg" width="24" height="24" alt=""> X</h2><p class="connection-subtitle">Videos, clips & account analytics</p>
+          <p>Native X Analytics exports supply video views, watch time, post impressions and engagement. Post impressions are separate from video views.</p>
+          <dl><div><dt>Native report captured</dt><dd id="x-native-date">Checking</dd></div></dl>
+          <p class="connection-help">A dated native capture is saved online. Refresh keeps that capture until a newer X report is imported; no automatic X API connection is configured.</p>
+          <a class="text-button" href="/sponsor.html?platform=x">View X report →</a>
+        </article>
         <article class="connection-card" data-source="youtube">
           <div class="connection-card-top"><span class="source-number">01</span><span class="pill" data-field="status">Checking</span></div>
           <h2>YouTube</h2><p class="connection-subtitle">Channel &amp; episode analytics</p>

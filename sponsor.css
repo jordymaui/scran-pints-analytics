@@ -47,3 +47,9 @@
 .yeet-collab-insights-summary{margin:22px 0}.yeet-collab-insights-summary h3{font-size:20px;margin-bottom:13px}.yeet-collab-insights-summary>div{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.yeet-collab-insights-summary>div>div{background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:16px}.yeet-collab-insights-summary span{font-size:15px;color:var(--muted)}.yeet-collab-insights-summary strong{display:block;font-size:30px;line-height:1.5;letter-spacing:-.5px}.yeet-collab-insights-summary small{font-size:11px;color:var(--muted);line-height:1.6;display:block}@media(max-width:800px){.yeet-collab-insights-summary>div{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:540px){.yeet-collab-insights-summary>div{gap:9px}.yeet-collab-insights-summary>div>div{padding:13px}.yeet-collab-insights-summary strong{font-size:27px}}
 
 @media(min-width:900px){.yeet-refresh-status{max-width:500px;line-height:1.45}}
+/* Native X report controls share the workspace's cream, ink and red palette. */
+.yeet-segmented{display:flex;flex-wrap:wrap;gap:4px;padding:5px;background:var(--cream-dark,#efe3cd);border-radius:7px;width:fit-content;margin:10px 0}
+.yeet-segmented button{appearance:none;border:0;border-radius:5px;background:transparent;color:var(--ink,#171717);padding:10px 14px;font:inherit;cursor:pointer;min-height:44px}
+.yeet-segmented button[aria-pressed="true"]{background:var(--ink,#171717);color:#fff}
+.yeet-segmented button:focus-visible{outline:3px solid #e30613;outline-offset:2px}
+.yeet-chart-total{display:block;font-size:1.5rem;margin:16px 0}

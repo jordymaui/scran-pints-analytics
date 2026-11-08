@@ -53,10 +53,11 @@ const socialPlatforms = [
   { id: 'youtube-longform', label: 'YouTube', detail: 'All formats · includes Shorts' },
   { id: 'instagram', label: 'Instagram', detail: 'Reels & posts' },
   { id: 'tiktok', label: 'TikTok', detail: 'Public videos' },
+  { id: 'x', label: 'X', detail: 'Native video views · post impressions shown separately' },
 ];
 function platformLogo(id) {
   if (id === 'footyscran') return '<img class="yeet-platform-logo yeet-footyscran-logo" src="/assets/platforms/footyscran.jpg" width="24" height="24" alt="" aria-hidden="true">';
-  const platform = { 'youtube-longform': 'youtube', youtube: 'youtube', instagram: 'instagram', tiktok: 'tiktok' }[id];
+  const platform = { 'youtube-longform': 'youtube', youtube: 'youtube', instagram: 'instagram', tiktok: 'tiktok', x: 'x' }[id];
   if (platform) return `<img class="yeet-platform-logo" src="/assets/platforms/${platform}.svg" width="24" height="24" alt="" aria-hidden="true">`;
   return id === 'all' ? '<svg class="yeet-all-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>' : '';
 }
@@ -161,6 +162,7 @@ function studioPercentageBars(rows, label = value => value) {
 }
 function sourceName(value) { return socialPlatforms.find(platform => platform.id === value?.id)?.label || 'This platform'; }
 function viewScope(value) {
+  if (value?.id === 'x') return 'Native video views · captured export';
   if (value?.manualCapture?.windows?.length) return `${[...value.manualCapture.windows].sort((a, b) => b.periodDays - a.periodDays)[0].label} · manual capture`;
   if (value?.counterScope === 'public-channel') return 'Lifetime channel views';
   if (value?.counterScope === 'public-content-lifetime' || value?.id === 'tiktok' &&
@@ -445,6 +447,8 @@ export function socialRefreshMessages(entries, before, after) {
     else if (tiktokEntry?.status === 'refreshed' && advanced) messages.push(`TikTok public counters refreshed${savedDate ? ` ${savedDate}` : ''}.`);
     else messages.push(`TikTok: ${saved}; ${tiktokEntry ? 'no newer capture' : 'refresh unconfirmed'}.`);
   }
+  const x = sourceOf(after, 'x') || sourceOf(before, 'x');
+  if (x?.status === 'snapshot') messages.push(`X: native report saved ${datesLabel([x.capturedAt]) || 'without a capture date'}; not refreshed by this API sync.`);
   return messages;
 }
 
@@ -472,7 +476,7 @@ function refreshOutcome(result) {
     : `YouTube could not be refreshed. Saved data is still shown.${retryTime(result.retryAt)}` };
 }
 
-let report = null, growthDays = 7, refreshing = false, refreshMessage = '', selectedSource = 'all';
+let report = null, growthDays = 7, refreshing = false, refreshMessage = '', selectedSource = typeof location !== 'undefined' && /(?:[?&])platform=x(?:&|$)/.test(location.search) ? 'x' : 'all';
 let studioMetric = 'views', studioDays = 90, audiencePopulation = 'viewers';
 let allPeriod = '7d', allMetric = 'views', allDailyExpanded = false;
 let instagramDays = 30;
@@ -653,7 +657,7 @@ function renderInstagramCapture(channel) {
   window.SPSelect?.refresh(document.querySelector('#workspace'));
 }
 
-const allPlatformColours = { 'youtube-longform': '#db0b19', youtube: '#db0b19', instagram: '#8a597e', tiktok: '#248b83' };
+const allPlatformColours = { 'youtube-longform': '#db0b19', youtube: '#db0b19', instagram: '#8a597e', tiktok: '#248b83', x: '#6b747c' };
 function allPlatformColour(id) { return allPlatformColours[id] || '#8c8172'; }
 
 function allReportedChart(rows, platforms, metricLabel, cumulative = false) {
@@ -838,13 +842,35 @@ function renderAllSocials() {
   document.querySelectorAll('[data-all-metric]').forEach(button => button.addEventListener('click', () => { allMetric = button.dataset.allMetric; render(); }));
 }
 
+let xPeriod = 'all', xMetric = 'views';
+function renderXCapture(channel) {
+  const x = channel?.xAnalytics;
+  if (!x) return;
+  const metrics = [['views', 'Video views'], ['impressions', 'Post impressions'], ['engagements', 'Account engagements'], ['watchHours', 'Watch hours']];
+  const videoMetric = ['views', 'watchHours'].includes(xMetric), nativeRange = videoMetric ? x.videoDateRange : x.accountDateRange;
+  const days = xPeriod === '7d' ? 7 : xPeriod === '30d' ? 30 : null;
+  const start = days ? addDays(nativeRange.end, 1 - days) : nativeRange.start;
+  const rows = x.daily.filter(r => r.date >= start && r.date <= nativeRange.end);
+  const values = rows.map(r => r[xMetric]).filter(Number.isFinite), total = values.length ? values.reduce((s, n) => s + n, 0) : null;
+  const performance = { capturedAt: x.capturedAt, dateRange: { start, end: nativeRange.end }, daily: rows };
+  const chosen = metrics.find(r => r[0] === xMetric)[1];
+  const captured = `Native X export · captured ${date(channel.capturedAt)}. The latest day can be partial; the export does not specify a timezone. Refresh keeps this report until a newer native capture is saved.`;
+  const audience = x.audience;
+  const library = [...x.videos].sort((a, b) => b.views - a.views);
+  const duration = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  document.querySelector('#workspace').innerHTML = `${sidebar()}<div class="app yeet-app"><header class="topbar"><div class="yeet-topbar-title"><div class="yeet-header-logo"><img src="/assets/yeet-logo.svg" width="1561" height="417" alt="YEET"></div><span>Performance report</span></div><span id="yeet-refresh"></span></header><main id="main" class="yeet-page"><div class="yeet-page-heading"><div><p class="yeet-eyebrow">SCRAN & PINTS × YEET</p><h1>X.</h1></div><span class="yeet-source-pill">${platformLogo('x')} @ScranPints</span></div><div class="yeet-platform-heading">${sourceTabs()}<span>Videos, clips & account reach</span></div><section class="yeet-section"><div class="yeet-section-heading"><h2>Reported performance</h2></div><div class="yeet-stats-grid">${metricCard('Video views', x.totals.views, rangeLabel(x.videoDateRange))}${metricCard('Watch time', x.totals.watchHours, rangeLabel(x.videoDateRange), 'h')}${metricCard('Post impressions', x.totals.impressions, rangeLabel(x.accountDateRange))}${metricCard('Followers', channel.metrics.followers, `Captured ${date(channel.capturedAt)}`)}</div><p class="yeet-chart-note">${escapeHTML(captured)} Video views contribute to All socials once. Post impressions are separate and are never added to video views.</p><article class="yeet-panel"><div class="yeet-panel-heading"><div><h3>${chosen} over time</h3><p>${date(start)} – ${date(nativeRange.end)}</p></div><div class="yeet-segmented">${[['7d', '7D'], ['30d', '30D'], ['all', 'ALL TIME']].map(([id, label]) => `<button type="button" data-x-period="${id}" aria-pressed="${xPeriod === id}">${label}</button>`).join('')}</div></div><div class="yeet-segmented">${metrics.map(([id, label]) => `<button type="button" data-x-metric="${id}" aria-pressed="${xMetric === id}">${label}</button>`).join('')}</div><strong class="yeet-chart-total">${compact(total)} ${chosen.toLowerCase()}</strong>${cumulativeChart(performance, { metric: xMetric, cumulative: false })}<p class="yeet-chart-note">${videoMetric ? 'Native video reporting.' : 'Native account activity across all post types.'} Missing dates remain gaps.</p></article></section><section class="yeet-section"><div class="yeet-section-heading"><h2>Account engagement</h2></div><div class="yeet-stats-grid">${metricCard('Engagements', x.totals.engagements, rangeLabel(x.accountDateRange))}${metricCard('Likes', x.totals.likes, 'Account activity')}${metricCard('Replies', x.totals.comments, 'Account activity')}${metricCard('Reposts', x.totals.reposts, 'Account activity')}</div><p class="yeet-chart-note">Native engagements can include clicks and other actions. They are not just likes, replies and reposts.</p></section><section class="yeet-section"><div class="yeet-section-heading"><h2>Video library</h2><span>${library.length} uploaded videos & clips</span></div><div class="yeet-panel"><div class="table-wrap"><table class="data-table"><thead><tr><th>Video</th><th>Published</th><th>Length</th><th>Views at capture</th></tr></thead><tbody>${library.map(v => `<tr><td>${escapeHTML(v.title === 'Untitled' ? `Video · ${date(v.publishedOn)}` : v.title)}</td><td>${date(v.publishedOn)}</td><td>${duration(v.durationSeconds)}</td><td>${number(v.views)}</td></tr>`).join('')}</tbody></table></div><p class="yeet-chart-note">Native library counters at capture. Their sum is not used to replace the daily report or added to All socials again.</p></div></section>${audience ? `<section class="yeet-section"><div class="yeet-section-heading"><h2>Impression audience</h2></div><p class="yeet-chart-note">${escapeHTML(audience.periodLabel)} · captured ${date(audience.capturedAt)}. This describes post impressions across all content; it is separate from the video-view audience. X says gender may be inferred.</p><div class="yeet-all-audience-grid"><article class="yeet-panel"><h3>Countries</h3>${studioPercentageBars(audience.country)}</article><article class="yeet-panel"><h3>Age</h3>${studioPercentageBars(audience.age)}</article><article class="yeet-panel"><h3>Gender</h3>${studioPercentageBars(audience.gender)}</article></div></section>` : ''}<footer class="yeet-footer"><p>${escapeHTML(captured)}</p><a href="https://x.com/ScranPints" target="_blank" rel="noreferrer">@ScranPints ↗</a></footer></main></div>`;
+  renderRefresh(); bindPlatformTabs();
+  document.querySelectorAll('[data-x-period]').forEach(b => b.addEventListener('click', () => { xPeriod = b.dataset.xPeriod; render(); }));
+  document.querySelectorAll('[data-x-metric]').forEach(b => b.addEventListener('click', () => { xMetric = b.dataset.xMetric; render(); }));
+}
 function render() {
   if (selectedSource === 'all') { renderAllSocials(); return; }
   if (selectedSource === 'footyscran') { renderFootyScran(); return; }
   if (selectedSource === 'instagram' && source()?.manualCapture) { renderInstagramCapture(source()); return; }
+  if (selectedSource === 'x' && source()?.xAnalytics) { renderXCapture(source()); return; }
   const channel = source() || { id: selectedSource }, performance = sourcePerformance(channel);
   const platform = socialPlatforms.find(item => item.id === selectedSource);
-  document.querySelector('#workspace').innerHTML = `${sidebar()}<div class="app yeet-app"><header class="topbar"><div class="yeet-topbar-title"><div class="yeet-header-logo"><img src="/assets/yeet-logo.svg" width="1561" height="417" alt="YEET"></div><span>Performance report</span></div><div class="top-actions"><span id="yeet-refresh"></span></div></header><main id="main" class="yeet-page"><div class="yeet-page-heading"><div><p class="yeet-eyebrow">SCRAN & PINTS × YEET</p><h1>The numbers.</h1></div><span class="yeet-source-pill">YouTube · Instagram · TikTok</span></div>${sourceSummary()}<div class="yeet-platform-heading">${sourceTabs()}<span>${escapeHTML(platform.detail)}</span></div><section aria-labelledby="yeet-all-time" class="yeet-section">${allTimeContent(channel, performance)}</section><section id="yeet-growth" class="yeet-section" aria-label="Growth">${growthContent(performance)}</section><section class="yeet-section" aria-labelledby="yeet-audience"><div class="yeet-section-heading"><div><span class="yeet-section-number">03</span><h2 id="yeet-audience">Audience</h2></div></div>${audienceContent(channel)}</section><footer class="yeet-footer"><p>Each platform shows its own reporting coverage. YouTube includes Shorts; views and followers are not unique people across accounts.</p><a href="https://scranpints.com" target="_blank" rel="noreferrer">scranpints.com ↗</a></footer></main></div>`;
+  document.querySelector('#workspace').innerHTML = `${sidebar()}<div class="app yeet-app"><header class="topbar"><div class="yeet-topbar-title"><div class="yeet-header-logo"><img src="/assets/yeet-logo.svg" width="1561" height="417" alt="YEET"></div><span>Performance report</span></div><div class="top-actions"><span id="yeet-refresh"></span></div></header><main id="main" class="yeet-page"><div class="yeet-page-heading"><div><p class="yeet-eyebrow">SCRAN & PINTS × YEET</p><h1>The numbers.</h1></div><span class="yeet-source-pill">YouTube · Instagram · TikTok · X</span></div>${sourceSummary()}<div class="yeet-platform-heading">${sourceTabs()}<span>${escapeHTML(platform.detail)}</span></div><section aria-labelledby="yeet-all-time" class="yeet-section">${allTimeContent(channel, performance)}</section><section id="yeet-growth" class="yeet-section" aria-label="Growth">${growthContent(performance)}</section><section class="yeet-section" aria-labelledby="yeet-audience"><div class="yeet-section-heading"><div><span class="yeet-section-number">03</span><h2 id="yeet-audience">Audience</h2></div></div>${audienceContent(channel)}</section><footer class="yeet-footer"><p>Each platform shows its own reporting coverage. YouTube includes Shorts; views and followers are not unique people across accounts.</p><a href="https://scranpints.com" target="_blank" rel="noreferrer">scranpints.com ↗</a></footer></main></div>`;
   renderRefresh(); bindGrowth();
   document.querySelector('#yeet-studio-metric')?.addEventListener('change', event => { studioMetric = event.target.value; render(); });
   document.querySelector('#yeet-studio-period')?.addEventListener('change', event => { studioDays = Number(event.target.value); render(); });

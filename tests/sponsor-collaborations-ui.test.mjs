@@ -149,7 +149,7 @@ test('partial, absent and zero totals do not become fake percentages', () => {
 test('FootyScran remains a non-additive collab view and combined totals are unchanged', () => {
   const { context, workspace, fixture } = ui();
   assert.match(workspace.innerHTML, /data-yeet-source="footyscran" aria-pressed="true"/);
-  assert.deepEqual(Array.from(context.sponsorSources(fixture), item => item.id), ['youtube-longform', 'instagram', 'tiktok']);
+  assert.deepEqual(Array.from(context.sponsorSources(fixture), item => item.id), ['youtube-longform', 'instagram', 'tiktok', 'x']);
   const without = structuredClone(fixture);
   delete without.sources[0].manualCapture.collaborations;
   assert.deepEqual(buildAllSocialAnalytics(fixture, 'all'), buildAllSocialAnalytics(without, 'all'));

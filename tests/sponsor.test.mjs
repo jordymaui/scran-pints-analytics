@@ -65,9 +65,10 @@ test('sponsor platform summaries include each social account once and exclude th
   const sources = context.sponsorSources({ sources: [
     { id: 'youtube-longform', metrics: { views: 100 } }, { id: 'youtube-shorts', metrics: { views: 80 } },
     { id: 'instagram', metrics: { views: 40 } }, { id: 'tiktok', metrics: { views: 30 } },
+    { id: 'x', metrics: { views: 20 } },
   ] });
-  assert.deepEqual(plain(sources.map(item => item.id)), ['youtube-longform', 'instagram', 'tiktok']);
-  assert.equal(sources.reduce((sum, item) => sum + item.source.metrics.views, 0), 170);
+  assert.deepEqual(plain(sources.map(item => item.id)), ['youtube-longform', 'instagram', 'tiktok', 'x']);
+  assert.equal(sources.reduce((sum, item) => sum + item.source.metrics.views, 0), 190);
 });
 
 test('social daily account activity stays separate from lifetime media totals', () => {

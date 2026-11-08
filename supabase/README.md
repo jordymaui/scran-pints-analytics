@@ -10,6 +10,8 @@ This is an applied provisioning script, not a generated or recorded Supabase CLI
 
 ## Verification
 
+`x-native-capture.sql` expands only the private snapshot and history source checks to accept `x`. X is a dated native Analytics capture, excluded from automated provider jobs and credentials. The public report validates its selected video views, account metrics and impression audience; it excludes revenue, private edit links and raw exports. Refresh retains the X capture until a newer export is saved.
+
 [`verify.sql`](verify.sql) confirmed all six tables have RLS and service-only access, and all five functions use invoker security with service-only execution. The advisor's absence-of-policy notices are expected for these tables: browser roles intentionally have no access.
 
 Database behavior was also checked under `SET LOCAL ROLE service_role` within a transaction that ended in `ROLLBACK`:
