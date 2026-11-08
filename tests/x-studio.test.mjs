@@ -51,4 +51,5 @@ test('X tab renders native history controls, separate impressions and its safe v
   assert.match(workspace.innerHTML, /never added to video views/); assert.doesNotMatch(workspace.innerHTML, /studio\.x\.com|private-edit|99999/);
   vm.runInContext("xPeriod='30d'; xMetric='impressions'; render();", context);
   assert.match(workspace.innerHTML, /Post impressions over time/);
+  assert.match(workspace.innerHTML, /Daily X post impressions/);
 });
