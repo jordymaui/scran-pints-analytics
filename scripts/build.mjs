@@ -17,6 +17,7 @@ export const PUBLIC_FILES = Object.freeze([
   'sponsor.js', 'sponsor.css', 'assets/yeet-logo.svg',
   'assets/platforms/footyscran.jpg',
   'assets/platforms/youtube.svg', 'assets/platforms/instagram.svg', 'assets/platforms/tiktok.svg',
+  'assets/platforms/x.svg',
   'upload-analytics.js', 'upload-analytics.css',
   'workshop.html', 'workshop.js', 'workshop.css',
   'login.html', 'login.js', 'login.css', 'favicon.png',

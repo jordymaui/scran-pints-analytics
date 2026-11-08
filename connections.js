@@ -42,6 +42,7 @@ let statusPending = false;
 let teamAccess = false;
 let reviewedStudioReport = null;
 let instagramManualCapture = null;
+let xNativeCapture = null;
 let instagramBrowser = null;
 let browserPending = false;
 let browserPollTimer = null;
@@ -201,6 +202,8 @@ function message(text, success = false) {
 }
 function instagramCapturedReport(source){const capture=source?.id==='instagram'?source.manualCapture:null;if(!['manual-browser-inspection','browser-sweep'].includes(capture?.method)||!Array.isArray(capture.windows))return null;const window=capture.windows.find(row=>row.periodDays===90)||[...capture.windows].sort((a,b)=>b.periodDays-a.periodDays)[0];return window?{capture,window,manualOnly:source.provenance?.kind==='manual-browser',browserSweep:capture.method==='browser-sweep'}:null;}
 function renderStatus() {
+  const xStatus = $('#x-native-status'), xReport = typeof xNativeCapture === 'undefined' ? null : xNativeCapture;
+  if(xStatus){xStatus.textContent=xReport?'Native capture saved':'Awaiting native capture';$('#x-native-date').textContent=xReport?formatDate(xReport.capturedAt):'Not collected';}
   const platforms = new Map(current.platforms.map(platform => [platform.id, platform]));
   for (const source of sourceIds) {
     const platform = platforms.get(source) || {};
@@ -346,7 +349,7 @@ async function loadStatus({ showCallback = false } = {}) {
     ]);
     const reportResponse = reportResult.status === 'fulfilled' ? reportResult.value : null;
     if (reportResponse?.ok) {
-      try { const report = await reportResponse.json(); instagramManualCapture = report.schemaVersion === 1 && Array.isArray(report.sources) ? instagramCapturedReport(report.sources.find(source => source.id === 'instagram')) : null; }
+      try { const report = await reportResponse.json(); xNativeCapture = report.sources?.find(source=>source.id==='x'&&source.xAnalytics)||null; instagramManualCapture = report.schemaVersion === 1 && Array.isArray(report.sources) ? instagramCapturedReport(report.sources.find(source => source.id === 'instagram')) : null; }
       catch { /* A failed public report read never changes API connection state. */ }
     }
     if (statusResult.status !== 'fulfilled') throw Error('Connection status unavailable');
